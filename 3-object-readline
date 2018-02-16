@@ -1,0 +1,13 @@
+set f [open iplist]
+set data [read $f]
+close $f
+
+foreach line $data {
+regexp {([^ ]*):([^ ]*):([^ ]*)} $line match ipadd dev_type access
+
+puts $ipadd
+puts $dev_type
+puts $access
+}
+
+#reads sample line: "1.1.1.1:router:ssh" then separates then to 3 objects
