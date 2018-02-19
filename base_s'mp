@@ -1,0 +1,63 @@
+[evarima@pdcd02-tools1a]~/SCRIPTS% cat testsnmp.sh 
+#!/usr/bin/expect
+
+set key [lindex $argv 0]
+set timeout 10
+set Directory /home/evarima/SCRIPTS/logs
+set CTR1 0
+set CTR2 0
+
+
+set f [open iplist]
+set ipadd [split [read -nonewline $f] "\n"]
+close $f
+
+log_file $Directory/SNMP_RESULT.txt
+send_log "IP Address\t\t\tStatus\n"
+log_file
+
+# Iterate over the hosts
+foreach host $ipadd {
+
+
+        spawn snmpwalk -c $key $host sysName
+        expect {
+                timeout {
+                                        log_file $Directory/SNMP_RESULT.txt
+                                        send_log "$host\t\t\tFAILED\n"
+                                        log_file
+										incr CTR2
+                                }
+                eof {
+                                        log_file $Directory/SNMP_RESULT.txt
+                                        send_log "$host\t\t\tFAILED\n"
+                                        log_file
+										incr CTR2
+                                }
+
+                "*sysName" {
+                                        log_file $Directory/SNMP_RESULT.txt
+                                        send_log "$host\t\t\tPASSED\n"
+                                        log_file
+										incr CTR1
+                                }
+
+        }
+}
+
+wait
+
+set total "[expr $Counter1+$Counter2]"
+
+puts "\n"
+puts "\n"
+puts "\n"
+
+puts "================="
+puts "Script completed"
+puts "TOTAL Device tested: $total"
+puts "SUCCESS: $CTR1"
+puts "FAILED: $CTR2"
+puts "================="
+
+exit
