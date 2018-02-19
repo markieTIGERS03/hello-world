@@ -1,0 +1,23 @@
+#!/usr/bin/bash
+
+
+
+
+while read line
+do
+        value=`cat interface | grep "$line" | awk '{print $1;}'`
+        touch $value.txt
+        echo "configure terminal" >> $value.txt
+        echo $line | head -n1 | awk '{print $2,$3,$4;}' >> $value.txt
+        echo "end" >> $value.txt
+
+done < interface
+
+
+**yung nireread niya na interface text file jan mangagaling input e.g.
+[evarima@pdcd43-tools1a]~/lab% cat interface 
+1.1.1.1 ip source-interface loopback100
+2.2.2.2 ip source-interface vlan200
+3.3.3.3 ip source-interface loopback300
+
+**key: yung backtick (`) executes anything inside then assign it to variable
