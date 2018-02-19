@@ -1,0 +1,108 @@
+#!/usr/bin/expect
+
+set timeout 15
+set snmpkey [lindex $argv 0]
+set dibug [lindex $argv 1]
+set Directory /home/<path>/SCRIPTS/logs
+set tdate [clock format [clock seconds] -format %Y-%h-%d_%H:%M:%S_ -timezone :Asia/Manila]
+set FNAME Post_test_Result.txt
+
+set PCTR1 0
+set PCTR2 0
+set SCTR1 0
+set SCTR2 0
+set VCTR1 0
+set VCTR2 0
+
+set LOGNAME "$Directory/$tdate$FNAME"
+
+log_user $dibug
+
+set f [open iplist]
+set ipadd [split [read -nonewline $f] "\n"]
+close $f
+
+log_file $LOGNAME
+send_log "IP Address\t\tPing\t\tSNMP\t\tLOGIN VTY\n"
+log_file
+
+send_user "IP ADDRESS                STATUS\n"
+
+# Iterate over the hosts
+foreach host $ipadd {
+
+##CHECK PING STATUS
+spawn ping -c3 -w2 $host
+expect {
+     "100% packet loss" {
+          log_file $LOGNAME
+          send_log "$host\t\tFAIL\t\t"
+          log_file
+          incr PCTR2
+     }
+     -re "\[0-9]% packet loss|\[0-9\]\[0-9\]% packet loss" {
+          log_file $LOGNAME
+          send_log "$host\t\tPASS\t\t"
+          log_file
+          incr PCTR1
+     }
+}
+
+##CHECK SNMP STATUS
+set temp1 [catch {exec snmpwalk -v2c -c $snmpkey $host sysName | grep -oP "(?<=STRING: )\[^$\]*"}]
+if {$temp1 == 0 } {
+        set sysName "PASS"
+		incr SCTR1
+} else {
+        set sysName "FAIL"
+		incr SCTR2
+}
+log_file $LOGNAME
+send_log "$sysName\t\t"
+log_file
+
+
+##CHECK SSH STATUS
+set LOGIN_STATUS [catch {
+        spawn -noecho ssh -o ConnectTimeout=10 -oStrictHostKeyChecking=no -l test $host
+        expect {
+        timeout {return}
+        eof {return}
+        "*assword:" {continue}
+        "*ser:" {continue}
+    }}]
+
+if {$LOGIN_STATUS == 4 } {
+        set SSH_STATUS "PASS"
+		incr VCTR1
+} else {
+        set SSH_STATUS "FAIL"
+		incr VCTR2
+    }
+log_file $LOGNAME
+send_log "$SSH_STATUS\n"
+log_file
+send_user "$host\t\tCOMPLETED"
+}
+
+set total "[expr $PCTR1+$PCTR2]"
+
+puts "\n"
+puts "\n"
+puts "\n"
+
+puts "================="
+puts "Script completed"
+puts "TOTAL Device tested: $total"
+puts "PING SUCCESS: $PCTR1"
+puts "PING FAILED: $PCTR2"
+puts ""
+puts "SNMP SUCCESS: $SCTR1"
+puts "SNMP FAILED: $SCTR2"
+puts ""
+puts "VTY SUCCESS: $VCTR1"
+puts "VTY FAILED: $VCTR2"
+puts "view log file thru cat $LOGNAME"
+puts "================="
+
+exit
