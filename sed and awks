@@ -1,0 +1,22 @@
+awk '{$1=""; print $0}'  ---> will print everything after from 1st word
+awk '{$1=$2=""; print $0}' ---> will print everythin after 1st and 2nd word
+awk '{print $1;}' ---> will print 1st word
+awk '{$2=$2};1' <file>   /*Compress multiple space into 1 space*/
+awk '{print $0,"\n"}'  <file> /*Add new line*/
+awk 'NF' file /*remove empty space or line*/
+awk 'NF>1{print $NF}'  ---> will print last string in a sentence
+
+
+
+sed -ri 's/^[[:blank:]]+//' ---> will remove indention and overwrite file
+sed 'N;s/\n/ /' yourFile /*Combine odd and even row into one*/
+sed '0~1 a\StringToInster\' 1.txt ---> Insert a string every after 1 line
+
+
+
+grep -oP '(?<=JUNOS).*(?=Release)'  >>> GREP any string inbetween
+grep -oP '(?<=STRING: )[^.]*'   >>>> Starting string .. ending character
+grep -m1 ""  >>> Grep only first line
+grep -A 3 <STRING> >>> Will get also 3 next line after the match
+
+cat 1.txt | tr -d " \t"   >>> remove all white space
