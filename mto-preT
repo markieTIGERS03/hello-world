@@ -1,0 +1,150 @@
+#!/usr/bin/expect
+
+set timeout 15
+set snmpkey [lindex $argv 0]
+set dibug [lindex $argv 1]
+#set Password [lindex $argv 1]
+set Directory /home/<path>
+set tdate [clock format [clock seconds] -format %Y-%h-%d_%H:%M:%S_ -timezone :Asia/Manila]
+set FNAME Pretest_Result.txt
+
+set PCTR1 0
+set PCTR2 0
+set SCTR1 0
+set SCTR2 0
+
+set LOGNAME "$Directory/$tdate$FNAME"
+
+log_user $dibug
+
+set f [open iplist]
+set ipadd [split [read -nonewline $f] "\n"]
+close $f
+
+log_file $LOGNAME
+send_log "IP Address\t\tPing\t\tSNMP\t\tHostname\t\tIOS Version\t\tMgmt Int\tSerial\n"
+log_file
+
+send_user "IP ADDRESS                STATUS\n"
+
+# Iterate over the hosts
+foreach host $ipadd {
+
+spawn ping -c3 -w2 $host
+expect {
+     "100% packet loss" {
+          log_file $LOGNAME
+          send_log "$host\t\tFAILED\t\t"
+          log_file
+          incr PCTR2
+     }
+     -re "\[0-9]% packet loss|\[0-9\]\[0-9\]% packet loss" {
+          log_file $LOGNAME
+          send_log "$host\t\tPASSED\t\t"
+          log_file
+          incr PCTR1
+     }
+     }
+     
+spawn snmpwalk -c $key $host sysName
+expect {
+     timeout {
+          log_file $LOGNAME
+          send_log "FAILED\t\t"
+          log_file
+          incr SCTR2
+     }
+     eof {
+          log_file $LOGNAME
+          send_log "FAILED\t\t"
+          log_file
+          incr SCTR2
+     }
+     "*sysName" {
+          log_file $LOGNAME
+          send_log "PASSED\t\t"
+          log_file
+          incr SCTR1
+     }
+     }
+     
+##SEND IP ON LOG FILE
+#log_file $LOGNAME
+#send_log "$host\t\t"
+#log_file
+     
+##GET HOSTNAME
+set temp1 [catch {exec snmpwalk -v2c -c $snmpkey $host sysName | grep -oP "(?<=STRING: )\[^.\]*"}]
+     if {$temp1 == 0 } {
+          set sysName [exec snmpwalk -v2c -c $snmpkey $host sysName | grep -oP "(?<=STRING: )\[^.\]*"]
+     } else {
+          set sysName "   N/A"
+     }
+     log_file $LOGNAME
+     send_log "$sysName\t"
+     log_file
+     #sleep 1
+     
+##GET IOSVERSION
+set temp2 [catch {exec snmpwalk -v2c -c $snmpkey $host sysDescr | grep -oP "(?<=Version ).*(?= RELEASE)"}]
+     if {$temp2 == 0 } {
+          set IOS [exec snmpwalk -v2c -c $snmpkey $host sysDescr | grep -oP "(?<=Version ).*(?= RELEASE)"]
+     } else {
+          set IOS "               N/A"
+     }
+     log_file $LOGNAME
+     send_log "$IOS\t\t"
+     log_file
+     #sleep 1
+     
+##GET MGMTINT
+set temp3 [catch {exec snmpwalk -v2c -c $snmpkey $host ipAdEntIfIndex.$host | grep -oP "(?<=INTEGER: )\[^.\]*"}]
+     if {$temp3 == 0 } {
+          set IFINDX [exec snmpwalk -v2c -c $snmpkey $host ipAdEntIfIndex.$host | grep -oP "(?<=INTEGER: )\[^.\]*"]
+          set MGMTINT [exec snmpwalk -v2c -c $snmpkey $host ifDescr.$IFINDX | grep -oP "(?<=STRING: )\[^.\]*"]
+     } else {
+          set MGMTINT "   N/A"
+     }
+     log_file $LOGNAME
+     send_log "$MGMTINT\t\t"
+     log_file
+     #sleep 1
+     
+##GET SERIAL
+set temp4 [catch {exec snmpwalk -v2c -c $snmpkey $host 1.3.6.1.2.1.47.1.1.1.1.11.1 | grep -oP "(?<=\").*(?=\")"}]
+     if {$temp4 == 0 } {
+          set Serial [exec snmpwalk -v2c -c $snmpkey $host 1.3.6.1.2.1.47.1.1.1.1.11.1 | grep -oP "(?<=\").*(?=\")"]
+     } else {
+          set Serial "    N/A"
+     }
+     log_file $LOGNAME
+     send_log "$Serial\n"
+     log_file
+     #sleep 1
+     
+     send_user "$host                Completed\n"
+     
+     }
+
+wait
+
+set Ptotal "[expr $PCTR1+$PCTR2]"
+set Stotal "[expr $SCTR1+$SCTR2]"
+
+
+puts "\n"
+puts "\n"
+puts "\n"
+
+puts "================="
+puts "Script completed"
+puts "TOTAL Device tested: $Ptotal"
+puts "PING SUCCESS: $PCTR1"
+puts "PING FAILED: $PCTR2"
+puts ""
+puts "SNMP SUCCESS: $SCTR1"
+puts "SNMP FAILED: $SCTR2"
+puts "view log file thru cat $LOGNAME"
+puts "================="
+
+exit
