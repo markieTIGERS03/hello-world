@@ -1,0 +1,94 @@
+#!/usr/bin/expect
+
+set timeout 10
+set Directory /home/<path>/SCRIPTS/logs
+set Username [lindex $argv 0]
+set Password [lindex $argv 1]
+set dibug [lindex $argv 2]
+set CTRS 0
+set CTRF 0
+
+set f [open iplist]
+set ipadd [split [read -nonewline $f] "\n"]
+close $f
+
+set g [open commands]
+set commands [split [read -nonewline $g] "\n"]
+close $g
+
+log_user $dibug
+
+log_file $Directory/push_result.txt
+send_log "IP ADDRESS\t\tSTATUS\n"
+log_file
+wait
+
+# Iterate over the hosts
+foreach host $ipadd {
+
+set LOGIN_STATUS [catch {
+        spawn -noecho ssh -o ConnectTimeout=5 -oStrictHostKeyChecking=no -l test $host
+        expect {
+        timeout {return}
+        eof {return}
+        "*assword*:" {continue}
+        "*ser*:" {continue}
+    }}]
+
+if {$LOGIN_STATUS == 4 } {
+    log_file $Directory/$host
+    spawn ssh -oStrictHostKeyChecking=no $Username@$host
+    expect {
+        "assword:" { send "$Password\r"}
+    }
+
+    # Iterate over the commands
+    foreach cmd $commands {
+        expect {
+            "*#" {
+                send "$cmd\r"
+                 }
+            }
+        }
+
+        expect {
+                "*#" {send "exit\r"}
+        }
+        log_file
+	expect eof
+        #wait - nageeror pag nilalagay to combine with expect_eof
+		
+		log_file $Directory/push_result.txt
+        send_log "$host\t\tSUCCESS\n"
+		log_file
+		incr CTRS
+		wait
+
+
+        } else {
+		log_file $Directory/push_result.txt
+        send_log "$host\t\tFAIL\n"
+		log_file
+		incr CTRF
+		wait
+    }
+
+}
+
+set total "[expr $CTRS+$CTRF]"
+
+puts "\n"
+puts "\n"
+puts "\n"
+
+puts "================="
+puts "Script completed"
+puts ""
+puts "TOTAL Device in the list: $total"
+puts "Config PUSH SUCCESS: $CTRS"
+puts "Config PUSH FAILED: $CTRF"
+puts ""
+puts "view summary of push thru cat $Directory/push_result.txt"
+puts "================="
+
+exit
