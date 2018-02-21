@@ -37,38 +37,46 @@ expect {
           send_log "$host;FAILED;"
           log_file
           incr PCTR2
+                  set pingresult 0
      }
      -re "\[0-9]% packet loss|\[0-9\]\[0-9\]% packet loss" {
           log_file $LOGNAME
           send_log "$host;PASSED;"
           log_file
           incr PCTR1
+                  set pingresult 1
      }
 }
      
-spawn snmpwalk -c $snmpkey $host sysName
+if {$pingresult == 1} {
+         
+spawn snmpwalk -v2c -t3 -c $snmpkey $host sysName
 expect {
      timeout {
           log_file $LOGNAME
           send_log "FAILED;"
           log_file
           incr SCTR2
+                  set snmpresult 0
      }
      eof {
           log_file $LOGNAME
           send_log "FAILED;"
           log_file
           incr SCTR2
+                  set snmpresult 0
      }
-     "*sysName" {
+     "sysName" {
           log_file $LOGNAME
           send_log "PASSED;"
           log_file
           incr SCTR1
+                  set snmpresult 1
      }
 }
     
-     
+if {$snmpresult == 1} {
+
 ##GET HOSTNAME
 set temp1 [catch {exec snmpwalk -v2c -c $snmpkey $host sysName | grep -oP "(?<=STRING: ).*"}]
      if {$temp1 == 0 } {
@@ -131,18 +139,32 @@ set temp4 [catch {exec snmpwalk -v2c -c $snmpkey $host 1.3.6.1.2.1.47.1.1.1.1.11
      #sleep 1
 
 ##GET HWMODEL
-set temp7 [catch {exec snmpwalk -v2c -c $snmpkey $host sysDescr | grep -oP "\\s\\w\\d\\d\\d\\d\\s"}]
+set temp7 [catch {exec snmpwalk -v2c -c $snmpkey $host sysDescr | grep -oP "\\s\\w\\d\\d\\d\\d"}]
      if {$temp7 == 0 } {
-          set temp8 [exec snmpwalk -v2c -c $snmpkey $host sysDescr | grep -oP "\\s\\w\\d\\d\\d\\d\\s"]
+          set temp8 [exec snmpwalk -v2c -c $snmpkey $host sysDescr | grep -oP "\\s\\w\\d\\d\\d\\d"]
           set HWMODEL [string trim $temp8]
      } else {
           set HWMODEL "N/A"
      }
      log_file $LOGNAME
      send_log "$HWMODEL\n"
-     log_file  
-     send_user "$host\t\t\tCompleted\n"
-       
+     log_file
+     
+##SNMPRESULT IFELSE
+     } else {
+          log_file $LOGNAME
+          send_log "N/A;N/A;N/A;N/A;N/A\n"
+          log_file  
+     }
+
+##PINGRESULT IFELSE
+   } else {
+        log_file $LOGNAME
+        send_log "FAILED;N/A;N/A;N/A;N/A;N/A\n"
+        log_file  
+   }
+
+send_user "$host\t\t\tCompleted\n"       
 }
 
 wait
