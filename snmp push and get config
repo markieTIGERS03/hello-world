@@ -1,0 +1,40 @@
+
+#set transfer protocol (1-tftp; 2-ftp; 3-rcp; 4-scp)
+snmpset -v2c -c rURt68OF 172.19.24.100 1.3.6.1.4.1.9.9.96.1.1.1.1.2.99 i 1
+
+#set ccCopySourceFileType (1-file 4-running config)
+snmpset -v2c -c rURt68OF 172.19.24.100 1.3.6.1.4.1.9.9.96.1.1.1.1.3.99 i 4
+
+#set ccCopyDestFileType (1-file 4-running config)
+snmpset -v2c -c rURt68OF 172.19.24.100 1.3.6.1.4.1.9.9.96.1.1.1.1.4.99 i 1
+
+#set set server address
+snmpset -v2c -c rURt68OF 172.19.24.100 1.3.6.1.4.1.9.9.96.1.1.1.1.5.99 a 206.112.194.83
+
+#set file name (note this must exist and permission set to chmod 666)
+snmpset -v2c -c rURt68OF 172.19.24.100 1.3.6.1.4.1.9.9.96.1.1.1.1.6.99 s testfile.cfg
+
+#start transfer
+snmpset -v2c -c rURt68OF 172.19.24.100 1.3.6.1.4.1.9.9.96.1.1.1.1.14.99 i 1
+
+
+
+======post check=======
+
+#check transfer status (2-running; 3-success; 4-failed)
+snmpwalk -v2c -c rURt68OF 172.19.24.100 1.3.6.1.4.1.9.9.96.1.1.1.1.10
+
+#check failure reason (2-badfilename;3-timeout;4-nomem)
+snmpwalk -v2c -c rURt68OF 172.19.24.100 1.3.6.1.4.1.9.9.96.1.1.1.1.13
+
+#end session
+snmpset -v2c -c rURt68OF 172.19.24.100 1.3.6.1.4.1.9.9.96.1.1.1.1.14.99 i 6
+
+##note .99 is an arbitrary number.
+
+
+reference:
+https://supportforums.cisco.com/t5/other-network-infrastructure/uploading-running-configs-to-tftp/td-p/129761
+http://oidref.com/1.3.6.1.4.1.9.9.96.1.1.1.1.10
+https://supportforums.cisco.com/t5/lan-switching-and-routing/push-configuration-by-snmp/td-p/1507338
+https://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/15217-copy-configs-snmp.html
