@@ -1,0 +1,43 @@
+          procurve {
+               set LOGIN_STATUS [catch {
+               spawn ssh -o ConnectTimeout=10 -oStrictHostKeyChecking=no -l test $IP
+               expect {
+                  timeout {return}
+                  eof {return}
+                  -re "\[^ ]+assword:" {continue}}}]
+
+                if {$LOGIN_STATUS == 4 } {
+                    log_file $Directory/$IP
+                    spawn ssh -oStrictHostKeyChecking=no $Username@$IP
+                    expect {
+                        -re "\[^ ]+assword:" { send "$Password\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+>" { send "enable\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+sername:" {
+                           send "manager\r"
+                           expect "assword:" {send "$Enable\r"}
+                        }
+                        -re "\[^ ]+assword:" { send "$Enable\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+#$" { send "show ip route\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+#$" { send "exit\r"}
+                    }
+                    expect {
+                        -re "y/n" { send "y\r"}
+                    }
+                    log_file
+                    expect eof
+                    incr CTRS
+                } else {
+                    log_file $Directory/$IP
+                    send_log "$IP\t\tSSH FAIL\n"
+                    log_file
+                    incr CTRF
+                    }
+			    }
