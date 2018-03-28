@@ -1,0 +1,539 @@
+#!/usr/local/bin/perl -w
+
+use lib '/tools/perl/lib/';
+use lib '/tools/perl/arch/';
+use lib '../../modules';
+
+#moduels used    
+use strict;
+use warnings;
+use diagnostics;
+
+use Cwd;
+use Data::Dumper;
+use File::Path qw(make_path remove_tree);
+use Expect;
+use GES_Functions;
+use POSIX qw(strftime);
+
+# Ges_functions are coure subroutines most are general purpose some are ahold specific, uncomment a line to make use of htat functionality
+use GES_Functions qw(script_setup);
+use GES_Functions qw(load_device_array);
+use GES_Functions qw(log_into_device);
+#use GES_Functions qw(show_version);
+#use GES_Functions qw(parse_device);
+#use GES_Functions qw(parse_vlans);
+use GES_Functions qw(parse_interfaces_cisco);
+#use GES_Functions qw(parse_acl_cisco);
+#use GES_Functions qw(parse_interfaces_hp);
+use GES_Functions qw(snmp_get_sysinfo);
+#use GES_Functions qw(parse_snmp_result);
+#use GES_Functions qw(get_snmpv3_rw_string);
+use GES_Functions qw(is_ip);
+use GES_Functions qw(get_ip);
+#use GES_Functions qw(get_cinfo_by_ip);
+#use GES_Functions qw(get_cinfo_site_id_ip);
+#use GES_Functions qw(get_next_seed);
+#use GES_Functions qw(time_stamp);
+#use GES_Functions qw(get_date);
+#use GES_Functions qw(mac_dec_hex);
+#use GES_Functions qw(strip_line_terminator);
+#use GES_Functions qw(side_by_side_compare);
+#use GES_Functions qw(strip_ansi);
+use GES_Functions qw(IP_to_ce);
+#use GES_Functions qw(site_id_ce1);
+#use GES_Functions qw(filter_devices);
+#use GES_Functions qw(filter_CE2_router);
+use GES_Functions qw(send_email);
+#use GES_Functions qw(dump_array_blanks);
+use GES_Functions qw(array_to_banner);
+
+	# global variables
+	my @temp = ();
+	my @config_lines = ();
+	my @command_lines = ();
+    my %parms = ();
+	my %this_device = ();
+
+    #removing umask so saved files will contain desired permissions
+    umask(0000);
+	
+    # collect params from the command line
+    #--------------------------------------------------------------------------
+    # handle the command line arguments, error checking to ensure enough were passed
+    #
+    if ( $#ARGV == -1) {
+        &usage;
+        exit 0;
+    }
+    #
+	
+	push(@ARGV,'-cwd');
+	push(@ARGV,'foldernamehere');  # must change this for each new script (should be the name of the folder script is located in)
+	
+    %parms = script_setup(@ARGV);
+	
+	# this template by default supports forking, setting a default value of 1 fork 
+	if(! defined $parms{max_threads}){$parms{max_threads} = 1;} # pass a -z value to changed max threads
+	
+    # set some initial program values based on what is passed as parameters to the script
+	$parms{current_working_directory} = cwd();
+    if($parms{script_debug} =~ /a/){
+       system("clear\n");
+       print"\n\njust got back from the script_setup function call.\n\n";
+        foreach (sort keys %this_device) {
+          print "\$this_device{$_} = $this_device{$_}\n";
+        }
+        print"\n\n\n";
+          foreach (sort keys %parms) {
+          print "\$parms{$_} = $parms{$_}\n";
+        }
+        print"\n\n\n";<STDIN>;
+    }
+    #
+	
+	# module version check (ensures that the core modules file hasent changed )
+	my $rand_5 = 10000 + int rand(99999);
+	my $script_uat_version = '6.27';
+	if(GES_Functions->VERSION !~ /$script_uat_version/){
+        my @banner = ();
+        push(@banner,"");
+        push(@banner,"The $parms{full_script_name} script you are trying to run");
+        push(@banner,"relies on functions contained in the core modules file version $script_uat_version");
+        push(@banner,"which is now obsolete.");
+        push(@banner,"");
+        push(@banner,"This script has not been UAT tested since the last modification occurred to the core modules file.");
+        push(@banner,"The $parms{full_script_name} is being disabled until proper UAT testing occurs.");
+        push(@banner,"");
+        push(@banner,"");
+        push(@banner,"Please contact:");
+        push(@banner,"thomas.campion\@one.verizon.com");
+        push(@banner,"and ask for assistance in testing this script for your use.");
+        push(@banner,"");
+        #push(@banner,"");
+        #push(@banner,"");
+        #push(@banner,"Type in $rand_5 to continue inspite of the above WARNING and proceed with reckless abandon.");
+        #push(@banner,"");
+        #push(@banner,"Otherwise hit any other key to exit this script.");
+        &array_to_banner(@banner);
+		
+		exit;
+		
+		#print"\n\nApears the core modules file has been changed and this script has not yet passed UAT. USE at your own perril\n";
+
+		#my $input = <STDIN>;
+		#chomp($input);
+		#if($input == $rand_5){
+		#	# corect randome was entered
+		#	print"endtered correct random number\nok to continue\n";
+		#}else{
+		#	system("clear\n");
+		#	print"leaving script run at this time wrong number entered\n";
+		#}
+		##
+	}
+	#
+	
+	# get a date stamp when the script is started
+	$parms{date} = substr($parms{script_start_time},0,8);
+
+    # take seed value and put in devices array, filter if specified
+    my @devices = load_device_array(\%parms);
+    if($parms{script_debug} =~ /a/){
+        system("clear\n");
+        print"\n\nBelow is device array after load_device_array function\n\n";
+
+        for(@devices){print"Devices = $_\n";}
+
+        print"\n\nAbove is device array after load_device_array function\n";<STDIN>;
+    }
+    #
+
+	# this script requires a mode to run in if not supplied abort with error message (comment this section out if script isnt running a pre/push/post mode)
+	if(defined $parms{script_mode} && $parms{script_mode} =~ /unk/i){
+		system("clear\n");
+		print"\n\nThis script requires you to specify the mode the script is to run in!\nThe script was unable to parse a -t option from the commands you entered\n";
+		print"Please correct this error and try launching the script again.\n\n\n\n\n";
+		exit 0;
+	}
+	#
+	
+    print"Reports and commands getting saved to $parms{output_reports_folder}/\n"; #sleep(1);
+    print"Configs are getting saved to $parms{output_configs_folder}/\n\n"; #sleep(2);
+	
+	system("mkdir -p $parms{output_configs_folder}");
+	system("mkdir -p $parms{output_reports_folder}");
+	
+	#  initialise some vairables for use
+    $parms{summary_csv_file} = "$parms{output_reports_folder}/$parms{short_script_name}_$parms{script_start_time}_$parms{customer_short_name}_$parms{script_mode}_summary.csv";
+	$parms{device_commands_file} = "$parms{output_reports_folder}/$parms{short_script_name}_$parms{script_start_time}_$parms{customer_short_name}_$parms{script_mode}_cmds.txt";
+	$parms{error_log_file} = "$parms{output_reports_folder}/$parms{short_script_name}_$parms{script_start_time}_$parms{customer_short_name}_$parms{script_mode}_error_log.txt";
+
+	# get rid of any old error logs and start a new one
+	if(-e "$parms{summary_csv_file}"){unlink("$parms{summary_csv_file}");	}
+	if(-e "$parms{device_commands_file}"){unlink("$parms{device_commands_file}}");	}
+	if(-e "$parms{error_log_file}"){unlink("$parms{error_log_file}");	}
+
+	# work out the header for csv summary file (these will be changed based on output needed by the script)
+	my $summary_report_line = '';
+	if($parms{script_mode} =~ /unk/i){	
+	    $summary_report_line = "\"Entity Name\",\"Host Name\",\"IP Address\",\"";
+	}
+	if($parms{script_mode} =~ /pre/i){	
+	    $summary_report_line = "\"Entity Name\",\"Host Name\",\"IP Address\",\"";
+	}
+	if($parms{script_mode} =~ /push/i){	
+	    $summary_report_line = "\"Entity Name\",\"Host Name\",\"IP Address\",\"";
+	}
+	if($parms{script_mode} =~ /post/i){	
+	    $summary_report_line = "\"Entity Name\",\"Host Name\",\"IP Address\",\"";
+	}
+	#
+
+	# Save report header lines to the sumary csv file
+	update_file($parms{summary_csv_file},$summary_report_line);
+
+	#####################################################  All forked stuff goes in this section  ###################################################################################
+	{
+		sub this_job{
+			
+			# this_job function encapuslates everything the script is to do
+			# A seperate copy of this function will run as a forked job doing the work for a single device
+	
+			# first step split the passed line into parts
+			my $this_line = '';
+			if( defined $_[0]){
+				$this_line = $_[0];
+			}
+			#
+			
+			# make sure that line doesnt begin with a leading comment
+			if($this_line =~ /^#/){
+				update_file($parms{error_log_file},$this_line);
+				exit;
+			}
+			#
+			
+			# make sure that $this_line has IP to work with
+			if(! get_ip($this_line)){
+				exit;
+			}
+			#
+
+			# parse the cinfo for this device
+			%this_device = ();
+			$this_device{management_ip} = get_ip($this_line);
+			my @line_parts = split(' ',$this_line);
+			$this_device{entity_name} = $line_parts[0];
+			$this_device{site_id} = substr($this_device{entity_name},8,4);
+			$this_device{device_type} = $line_parts[-1];			
+#print"\$this_line = $this_line\n";
+#print"\$this_device{management_ip} = $this_device{management_ip}\n";
+#print"\$this_device{entity_name} = $this_device{entity_name}\n";
+#print"\$this_device{site_id} = $this_device{site_id}\n";
+#print"\$this_device{device_type} = $this_device{device_type}\n\n\n";
+#<STDIN>;
+	
+			# create expect object to interact with the device
+			my $exp = Expect->new();  
+			$exp->raw_pty(1);
+			$exp->match_max('999999999');
+			if($parms{script_debug} =~ /e/){
+					#$exp->debug(0 | 1 | 2 | 3 | undef)
+					#$object->exp_internal(1 | 0)
+					$exp->debug(1);
+					$exp->exp_internal(1);
+			} else {
+					$exp->debug(0);
+					$exp->exp_internal(0);
+			}
+			#
+			
+			# parse this device into hash, function returns a hash string which needs to be dereferenced back into a hash
+			my ($returned_device,$returned_parms) = snmp_get_sysinfo(\%this_device,\%parms);
+			%this_device = %{$returned_device};
+			%parms = %{$returned_parms};
+			if($parms{script_debug} =~ /a/){
+			   system("clear\n");
+			   print"\n\njust got back from the snmp_get_sysinfo function call, in $parms{script_mode} mode\n\n";
+					 foreach (sort keys %this_device) {
+					   print "\$this_device{$_} = $this_device{$_}\n";
+					 }
+					 print"\n\n\n";
+					   foreach (sort keys %parms) {
+					   print "\$parms{$_} = $parms{$_}\n";
+					 }
+					 print"\n\n\n";<STDIN>;
+			}
+			#
+	
+			# attempt to log into this device and return collected values to this_device hash		
+			($returned_device,$returned_parms) = log_into_device(\%this_device,\%parms,$exp);
+			%this_device = %{$returned_device};
+			%parms = %{$returned_parms};
+			if($parms{script_debug} =~ /a/){
+				system("clear\n");
+				print"\n\njust got back from the log_into_device function call, in $parms{script_mode} mode\n\n";
+				chomp(%this_device);
+				foreach (sort keys %this_device) {
+				  if($_ =~ /show_vlan/){print "\$this_device{show_vlan} = Colected\n"; next;}
+				  if($_ =~ /acl_VTY_Access/){print "\$this_device{acl_VTY_Access} = Colected\n"; next;}
+				  if($_ =~ /acl_multi_subnet/){print "\$this_device{acl_multi_subnet} = Colected\n"; next;}
+				  if($_ =~ /show_dot1x/){print "\$this_device{show_dot1x} = Colected\n"; next;}
+				  if($_ =~ /vty_0_4_config/){print "\$this_device{vty_0_4_config} = Colected\n"; next;}
+				  if($_ =~ /tracking$/){print "\$this_device{tracking} = Colected\n"; next;}
+				  if($_ =~ /sho_run_ip_route/){print "\$this_device{sho_run_ip_route} = Colected\n"; next;}
+				  if($_ =~ /running_config/){print "\$this_device{runnning_config} = Colected\n"; next;}
+				  if($_ =~ /show_version/){print "\$this_device{show_version} = Colected\n"; next;}
+				  if($_ =~ /show_interface_brief/){print "\$this_device{show_interface_brief} = Colected\n"; next;}
+				  if($_ =~ /show_standby_brief/){print "\$this_device{show_standby_brief} = Colected\n"; next;}
+				  if($_ =~ /show_voice_call_summary/){print "\$this_device{show_voice_call_summary} = Colected\n"; next;}
+				  if($_ =~ /show_run_busy/){print "\$this_device{show_run_busy} = Colected\n"; next;}
+				  if($_ =~ /sho_mac_table/){print "\$this_device{sho_mac_table} = Colected\n"; next;}
+				  if($_ =~ /lldp_neighbor/){print "\$this_device{lldp_neighbor} = Colected\n"; next;}
+				  if($_ =~ /bgp_config/){print "\$this_device{bgp_config} = Colected\n"; next;}
+				  if($_ =~ /bgp_summary/){print "\$this_device{bgp_summary} = Colected\n"; next;}
+				  print "\$this_device{$_} = $this_device{$_}\n";
+				}
+				print"\n\n\n";
+				  foreach (sort keys %parms) {
+				  print "\$parms{$_} = $parms{$_}\n";
+				}
+				print"\n\n\n";<STDIN>;
+			}
+			#
+			
+			## figure out if this is ce1 or 2
+			#$this_device{CE} = IP_to_ce($this_device{site_id},$this_device{management_ip}) // '';
+
+			# check if this device is live, or log error and moved to the next device in the batch	
+			if($this_device{answers_5_pings} =~ /dead/i){
+				
+			    $summary_report_line = "\"$this_device{entity_name}\",\"UNK\",\"$this_device{management_ip}\"";
+				update_file($parms{summary_csv_file},$summary_report_line);
+
+				exit;
+			}
+			#			
+			
+			# capture to an array the current device config lines
+			@config_lines = ();
+			if(defined $this_device{running_config}){
+				@config_lines = split("\n",$this_device{running_config});
+				chomp(@config_lines);		
+			}
+			#
+
+			# check if I have some lines to save, and save if true (section can be commented out if you dont need to save current config )
+			if($#config_lines > 0){
+
+				print"checking for old copy of config for $this_device{entity_name}\n";
+				my $config_file = '';
+				if($parms{script_mode} =~ /unk/i){
+					$config_file = "$parms{output_configs_folder}/$this_device{entity_name}_$parms{script_start_time}.cfg.txt";
+				}else{
+					$config_file = "$parms{output_configs_folder}/$this_device{entity_name}_$parms{script_mode}_$parms{script_start_time}.cfg.txt";
+				}
+				if(-e "$config_file"){
+					print"deleting old config copy for $this_device{entity_name}\n";
+					unlink("$config_file");
+				}			
+				print"saving new config for $this_device{entity_name}\n";
+				open FILE, ">>$config_file" or die "$config_file" . ": $!";
+				print FILE "$_\n" for @config_lines;
+				close FILE; 		
+				print"all done with $this_device{entity_name}\n";
+				print"###################################################################\n\n";
+			}else{
+				# append to the error log unable for this line
+				update_file($parms{error_log_file},"$this_device{entity_name} : Unable to collect running config");				
+			}
+			#
+			
+			# Create interfaces hash by sending running config array to function
+			my ($returned_interface) = parse_interfaces_cisco(@config_lines);
+			my %interfaces = %{$returned_interface};			
+			
+			##############################################  any commands to run while loged into the device ##########################################
+		
+
+
+		
+			##############################################  end of device commands ###################################################################
+
+
+			# Save report header lines to the sumary csv file
+			$summary_report_line = "\"$this_device{entity_name}\",\"$this_device{hostanme}\",\"$this_device{management_ip}\",\",\"$found_desired\"";
+			update_file($parms{summary_csv_file},$summary_report_line);
+
+			
+	
+		}
+		#
+	
+		# fork the devices array into many jobs queue up to thread limit
+		sub array_forked (\@$&) {
+			my ($data, $max, $code) = @_;
+			my $c = 0;
+			foreach my $data (@$data) {
+			wait unless ++ $c <= $max;
+			die "Fork failed: $!\n" unless defined (my $pid = fork);
+			exit $code -> ($data) unless $pid;
+		}
+			1 until -1 == wait;
+		}
+		#
+	
+		# pass array of devices, number of forks to create, and a function which performs work for a single array item
+		array_forked (@devices,$parms{max_threads},\&this_job);
+	
+	}
+
+	#################################################################################################################################################################################
+	
+	
+    # email the report file
+    my %email = ();
+	
+	# jobs are all finished collect attachments and display ending banner
+	if(-e "$parms{output_reports_folder}/commands.z"){
+		unlink("$parms{output_reports_folder}/commands.z"); # get rid of the old one
+	}
+	#
+
+	my @comand_files =  `ls -al $parms{output_configs_folder}/*$parms{script_start_time}.cmd.txt`;
+	if($#comand_files){
+		system("zip -j $parms{output_reports_folder}/commands.z $parms{output_reports_folder}/*_$parms{date}.cmd.txt"); 	
+	}
+	#
+	
+	if(-e "$parms{output_configs_folder}/configs.z"){
+		unlink("$parms{output_configs_folder}/configs.z"); # get rid of the old one
+	}
+	#
+	my @config_files = `ls -al $parms{output_configs_folder}/*$parms{script_start_time}.cfg.txt`;
+
+	# see if anything is here to zip up, and if so zip it up
+	if($#config_files){
+		system("zip -j $parms{output_configs_folder}/configs.z $parms{output_configs_folder}/*_$parms{script_start_time}.cfg.txt"); 	
+	}
+	#
+
+	$email{attachment} = '';
+    if($parms{email_address} !~ /unk/i){
+        # look for any attachments and include on results email
+		if(-e "$parms{error_log_file}"){
+			# if others already exist append comma delimited
+			if(length($email{attachment}) > 0){
+				$email{attachment} .= ",$parms{error_log_file}";
+			}else{
+				$email{attachment} .= "$parms{error_log_file}";
+			}
+		}
+        if(-e "$parms{output_configs_folder}/configs.z"){
+			if(length($email{attachment}) > 0){
+				$email{attachment} .= ",$parms{output_configs_folder}/configs.z";
+			}else{
+				$email{attachment} .= "$parms{output_configs_folder}/configs.z";
+			}
+        }
+        if(-e "$parms{output_reports_folder}/commands.z"){
+			if(length($email{attachment}) > 0){
+				$email{attachment} .= ",$parms{output_reports_folder}/commands.z";
+			}else{
+				$email{attachment} .= "$parms{output_reports_folder}/commands.z";
+			}
+        }
+        if(-e "$parms{summary_csv_file}"){
+			# this is the csv report file
+			if(length($email{attachment}) > 0){
+				$email{attachment} .= ",$parms{summary_csv_file}";
+			}else{
+				$email{attachment} .= "$parms{summary_csv_file}";
+			}
+        }		
+		#
+
+        $email{address} = "$parms{email_address}";
+        $email{subject} = "Results for script you recently ran  for $parms{customer_short_name} using ";
+        $email{body} = "Attached to this email find the results for $parms{full_script_name} script you recently ran for $parms{customer_short_name}.\n\n";
+        my $email_result = send_email(\%email);    
+
+        my @banner = ();
+        push(@banner,"$parms{full_script_name} script");
+        push(@banner,"has finished $parms{script_mode} run,");
+        push(@banner,"check email for results!");
+        push(@banner,"");
+        push(@banner,"*** check junk-email-folder too!!! ****");
+        push(@banner,"");
+        push(@banner,"questions or improvement suggestions email");
+        push(@banner,"thomas.campion\@one.verizon.com");
+        &array_to_banner(@banner);        
+    } else {
+        my @banner = ();
+        push(@banner,"$parms{full_script_name} script");
+        push(@banner,"has finished $parms{script_mode} run,");
+        push(@banner,"");
+        push(@banner,"output files are located on the domain server");
+        push(@banner,"$parms{output_root_folder}");
+        push(@banner,"");
+        push(@banner,"questions or improvement suggestions email");
+        push(@banner,"thomas.campion\@one.verizon.com");
+        &array_to_banner(@banner);        
+    }
+    #
+
+exit 0;
+
+    # script specific subroutines
+
+	sub update_file {
+		my ($this_file,$this_line) = @_;
+	
+		open FILE, ">>$this_file" or die "$this_file" . ": $!";
+		print FILE "$this_line\n";
+		close FILE;			
+		
+	}
+	#
+
+    # displays online help for runing the script (change as needed for script)
+    sub usage{
+        
+    system("clear\n");
+
+    my @strng = split('/', $0);
+    $parms{script_name} = $strng[-1];
+    $parms{script_name} =~ s/\.pl//g; # get rid of the .pl file suffix    
+    
+    print <<"END_MESSAGE";
+    
+    $parms{script_name} script requires parameters to run. You're seeing this message because you asked for help, or didnt provide
+    the correct parameters.
+
+    List of parameters to use:
+    
+        -tu <your tacacs user id>           (Required)
+        -tp <your tacacs password>          (Required)
+        -csn <customer cmds short name>     (Required)
+        -fs <your cmds password>            (Optional, used to filter seed valid entries ce1,ce2,router,switch, or aruba)
+        -s <seed>                           (Required, can be IP,customer site ID, subnet, or text file site ID or list of ip's.)
+        -o <output folder>                  (Optional, but encouraged. Keeps your output separated. ex: tc_7_20_16)
+        -m <email address for results>      (Optional, Strongly encouraged. sends reports and results to email address.)
+        -t <test type (pre,post,push)>      (Required, options are pre, push, and post.)
+        
+                Some expamples of launching follow.
+
+        ./$parms{script_name} -tu v123456 -tp pa55w0rd -csn aholdus -fs router -s 500 -fs Router -o tc_7_20 -m your_email\@one.verizon.com  -t pre
+        ./$parms{script_name} -tu v123456 -tp pa55w0rd -csn aholdus -fs router -s 500 -fs Router -o tc_7_20 -m your_email\@one.verizon.com  -t push
+        ./$parms{script_name} -tu v123456 -tp pa55w0rd -csn aholdus -fs router -s 500 -fs Router -o tc_7_20 -m your_email\@one.verizon.com  -t post
+
+    order of arguments is not important but you have to supply all required switches listed above.
+
+
+
+
+END_MESSAGE
+         
+    }
+    #
