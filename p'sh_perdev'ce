@@ -1,0 +1,205 @@
+#!/usr/bin/expect
+
+set timeout 30
+set Username [lindex $argv 0]
+set Password [lindex $argv 1]
+set Enable [lindex $argv 2]
+set Directory /home/evarima/SCRIPTS/logs
+set tdate [clock format [clock seconds] -format %Y-%h-%d_%H:%M:%S_ -timezone :Asia/Manila]
+
+set FNAME IPAMAUDIT_RESULT.txt
+set LOGNAME "$Directory/$tdate$FNAME"
+
+set CTRS 0
+set CTRF 0
+
+set f [open iplist]
+set ipadd [split [read -nonewline $f] "\n"]
+close $f
+
+# Iterate over the hosts
+foreach host $ipadd {
+
+regexp {([^ ]+):([^ ]+)} $host match IP HWMODEL
+
+     switch -regexp $HWMODEL  {
+          cisco {
+               #set g [open commandsnexus]
+               #set commandsnxs [split [read -nonewline $g] "\n"]
+               #close $g
+               set LOGIN_STATUS [catch {
+               spawn ssh -o ConnectTimeout=10 -oStrictHostKeyChecking=no -l test $IP
+               expect {
+                  timeout {return}
+                  eof {return}
+                  -re "\[^ ]+assword:" {continue}}}]
+
+                if {$LOGIN_STATUS == 4 } {
+                    log_file $Directory/$IP
+                    spawn ssh -oStrictHostKeyChecking=no $Username@$IP
+                    expect {
+                        -re "\[^ ]+assword:" { send "$Password\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+>" { send "enable\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+assword:" { send "$Enable\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+#$" { send "show ip route connected\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+#$" { send "show ip route static\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+#$" { send "exit\r"}
+                    }
+                    log_file
+                    expect eof
+                    incr CTRS
+                } else {
+                    log_file $Directory/$IP
+                    send_log "$IP\t\tSSH FAIL\n"
+                    log_file
+                    incr CTRF
+                    }
+          }
+                                                  
+          riverbed {
+               set LOGIN_STATUS [catch {
+               spawn ssh -o ConnectTimeout=10 -oStrictHostKeyChecking=no -l test $IP
+               expect {
+                  timeout {return}
+                  eof {return}
+                  -re "\[^ ]+assword:" {continue}}}]
+
+                if {$LOGIN_STATUS == 4 } {
+                    log_file $Directory/$IP
+                    spawn ssh -oStrictHostKeyChecking=no $Username@$IP
+                    expect {
+                        -re "\[^ ]+assword:" { send "$Password\r"}
+                    }
+                    expect {
+                        -re ">" { send "enable\r"}
+                    }
+                    expect {
+                        -re "#" { send "show ip route\r"}
+                    }
+                    expect {
+                        -re "#" { send "exit\r"}
+                    }
+                    log_file
+                    expect eof
+                    incr CTRS
+                } else {
+                    log_file $Directory/$IP
+                    send_log "$IP\t\tSSH FAIL\n"
+                    log_file
+                    incr CTRF
+                    }
+          }
+
+          procurve {
+               set LOGIN_STATUS [catch {
+               spawn ssh -o ConnectTimeout=10 -oStrictHostKeyChecking=no -l test $IP
+               expect {
+                  timeout {return}
+                  eof {return}
+                  -re "\[^ ]+assword:" {continue}}}]
+
+                if {$LOGIN_STATUS == 4 } {
+                    log_file $Directory/$IP
+                    spawn ssh -oStrictHostKeyChecking=no $Username@$IP
+                    expect {
+                        -re "\[^ ]+assword:" { send "$Password\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+>" { send "enable\r"}
+                        -re "Press any key" {
+                           send "\r"
+                           expect -re "\[^ ]+>" { send "enable\r"}
+                        }
+                    }
+                    expect {
+                        -re "\[^ ]+sername:" {
+                           send "manager\r"
+                           expect "assword:" {send "$Enable\r"}
+                        }
+                        -re "\[^ ]+assword:" { send "$Enable\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+#" { send "show ip route\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+#" { send "logout\r"}
+                    }
+                    expect {
+                        -re "y/n" { send "y\r"}
+                    }
+                    log_file
+                    expect eof
+                    incr CTRS
+                } else {
+                    log_file $Directory/$IP
+                    send_log "$IP\t\tSSH FAIL\n"
+                    log_file
+                    incr CTRF
+                    }
+          }
+
+          comware {
+               set LOGIN_STATUS [catch {
+               spawn ssh -o ConnectTimeout=10 -oStrictHostKeyChecking=no -l test $IP
+               expect {
+                  timeout {return}
+                  eof {return}
+                  -re "\[^ ]+assword:" {continue}}}]
+
+                if {$LOGIN_STATUS == 4 } {
+                    log_file $Directory/$IP
+                    spawn ssh -oStrictHostKeyChecking=no $Username@$IP
+                    expect {
+                        -re "\[^ ]+assword:" { send "$Password\r"}
+                    }
+                    expect {
+                        -re "<\[^ ]+>" { send "display ip routing-table\r"}
+                    }
+                    expect {
+                        -re "<\[^ ]+>" { send "exit\r"}
+                    }
+                    log_file
+                    expect eof
+                    incr CTRS
+                } else {
+                    log_file $Directory/$IP
+                    send_log "$IP\t\tSSH FAIL\n"
+                    log_file
+                    incr CTRF
+                    }
+           }
+          default {
+               log_file $Directory/$IP
+               send_log "$IP\t\tUNKNOWN DEVICE\n"
+               log_file
+               puts "$IP is an UNKNOWN DEVICE"
+          }
+     }
+}
+
+set total "[expr $CTRS+$CTRF]"
+
+puts "\n"
+puts "\n"
+puts "\n"
+
+puts "================="
+puts "Script completed"
+puts ""
+puts "TOTAL Device in the list: $total"
+puts "Config PUSH SUCCESS: $CTRS"
+puts "Config PUSH FAILED: $CTRF"
+puts ""
+puts "================="
+
+exit
