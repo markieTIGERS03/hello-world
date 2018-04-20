@@ -1,0 +1,49 @@
+https://askubuntu.com/questions/1705/how-can-i-create-a-select-menu-in-a-shell-script
+http://www.learnshell.org/
+http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_09_05.html
+
+#!/bin/bash
+# Bash Menu Script Example
+
+PS3='Please enter your option: '
+options=("Option 1" "Option 2" "Option 3" "Quit")
+choice=("choice 1" "choice 2" "choice 3" "Quit")
+clear
+select opt in "${options[@]}"
+do
+    case $opt in
+        "Option 1")
+            clear
+            PS3='Please enter your choice: '
+            select choi in "${choice[@]}"
+            do
+               case $opt in
+                  "Option 1")
+                      echo "you chose choice 1"
+                      ;;
+                  "Option 2")
+                      echo "you chose choice 2"
+                      ;;
+                  "Option 3")
+                      echo "you chose choice 3"
+                      ;;
+                   "Quit")
+                      break
+                      ;;
+                   *) echo invalid option;;
+               esac
+            done
+
+            ;;
+        "Option 2")
+            echo "you chose choice 2"
+            ;;
+        "Option 3")
+            echo "you chose choice 3"
+            ;;
+        "Quit")
+            break
+            ;;
+        *) echo invalid option;;
+    esac
+done
