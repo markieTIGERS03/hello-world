@@ -1,0 +1,1672 @@
+########################################BASH######################################################
+#v1.5
+echo -e "\e[1;7mgo/bashtweaks\e[0m for info"
+#
+
+promptval="\[\033[0;34m\]G\[\033[0;91m\]o\[\033[0;93m\]o\[\033[0;34m\]g\[\033[0;32m\]l\[\033[0;91m\]e"
+
+promptvar() {
+
+clear
+
+echo -e "Choose your bash prompt:\n\n
+1.) \e[34mG\e[91mo\e[93mo\e[34mg\e[32ml\e[91me\n
+\e[0m2.) \e[91mAlphabet\n
+\e[0m3.) \e[97;44mG\e[97;101mN\e[97;103mO\e[97;42mC\e[0m\n"
+
+read -p "Enter choice:" promptval
+
+case "$promptval" in
+        "1")
+        sed -i '7s/.*/promptval=\"\\[\\033[0;34m\\]G\\[\\033[0;91m\\]o\\[\\033[0;93m\\]o\\[\\033[0;34m\\]g\\[\\033[0;32m\\]l\\[\\033[0;91m\\]e\"/' ~/.bash_tweaks;;
+        "2")
+        sed -i '7s/.*/promptval=\"\\[\\033[0;91m\\]Alphabet\"/' ~/.bash_tweaks ;;
+        "3")
+        sed -i '7s/.*/promptval=\"\\[\\033[0;97;44m\\]G\\[\\033[0;97;101m\\]N\\[\\033[0;97;103m\\]O\\[\\033[0;97;42m\\]C\"/' ~/.bash_tweaks ;;
+       
+        "0")
+        sed -i '7s/.*/promptval=\"\\[\\033[1;97m\\]â’¼ â“„ â“„ â’¼ â“ â’º \"/' ~/.bash_tweaks ;;
+
+	 *) echo "Incorrect choice!"
+
+esac
+
+source ~/.bashrc
+
+}
+
+####### TWEAK PROMPT ######
+PS1="\[\e[0;97m\]\u@\h:\W$promptval\[\e[0;97m\]\$\[\033[00m\]"
+
+
+
+alias flutesynch='scp noc5.mnl:/usr/local/google/flute/*.* /usr/local/google/flute/;cp /usr/local/google/flute/b.flute ~/.bash_devices'
+
+#Morph mac address into different formats#
+morph() {
+
+OPTIND=1;
+
+if [[ -z $2 ]]
+        then
+                echo "Incorrect usage."
+                echo "Choose options below:"
+                echo "-c <MAC Address> for Cisco xxxx.xxxx.xxxx format."
+                echo "-S <MAC Address> for standard XX:XX:XX:XX:XX:XX format."
+                echo "-s <MAC Address> for standard xx:xx:xx:xx:xx:xx format."
+        else
+
+flag=cisco
+
+while getopts ":c:s:S" arg;
+do
+        case "${arg}" in
+                c)
+                        flag=cisco ;;
+                s)
+                        flag=standard ;;
+                S)
+                        flag=STANDARD ;;
+                *)
+                        flag=null ;;
+        esac
+
+done
+
+
+
+case "$flag" in
+        "cisco")
+                echo $2 | tr -d ':.-' | tr [:upper:] [:lower:] | sed 's/.\{4\}/&./g' | sed 's/.$//';;
+        "standard")
+                echo $2 | tr -d ':.-' | tr [:upper:] [:lower:] | sed 's/.\{2\}/&:/g' | sed 's/.$//';;
+        "STANDARD")
+                echo $2 | tr -d ':.-' | tr [:lower:] [:upper:] | sed 's/.\{2\}/&:/g' | sed 's/.$//';;
+        "null")
+                echo "Incorrect usage."
+                echo "Choose options below:"
+                echo "-c <MAC Address> for Cisco xxxx.xxxx.xxxx format."
+                echo "-S <MAC Address> for standard XX:XX:XX:XX:XX:XX format."
+                echo "-s <MAC Address> for standard xx:xx:xx:xx:xx:xx format."       
+esac
+
+
+fi
+
+}
+
+
+
+###### ACCESS DAILY ROUTINE ######
+#Prodaccess Fix#
+alias gnubbyssh="sudo goobuntu-config -U set sshd_pubkeys recommended
+sudo goobuntu-config -U set sshd_auth recommended
+sudo goobuntu-updater
+ssh-add -L | egrep -q ' ((corp|prod)/normal|publickey)$' && echo 'Google SSH successfully setup' || echo 'No Google SSH credentials found'
+prodaccess --corp_ssh"
+
+#Daily Access#
+alias ax='cp /usr/local/google/flute/b.flute ~/.bash_devices; prodaccess; /google/data/ro/projects/tacacs/corp/enable_account.sh;/google/data/ro/projects/tacacs/corpprc/enable_account.sh; source ~/.bashrc'
+
+
+
+###### GNOC TOOLS ######
+alias ipdb_client='/google/data/ro/projects/netops/ipdb_client.par'
+alias create_rev_zone='/google/data/ro/teams/ci-sre/create_rev_zone.par'
+alias chipmunkutil='/google/data/ro/projects/netops/chipmunkutil.par'
+# set PATH so it includes google tools
+echo $PATH | grep \/google\/data\/ro\/projects\/netopscorp > /dev/null
+if [ ! $? -eq 0 ]
+       then
+       PATH=\/google\/data\/ro\/projects\/netopscorp:"${PATH}"
+fi
+
+
+#DEVICES LIST#
+if [ -f ~/.bash_devices ]; then
+    . ~/.bash_devices
+fi
+
+
+
+#go to noc station#
+go () { ssh noc"$1".mnl; }
+
+
+
+###### GO DIRECTLY TO GATEWAY ######
+gohome() {  target=`cdb host show $1 | grep "IPv4 Address" | awk {'print $4'}`;home_target=`cdb netblock show $target | grep Router | awk {'print $3'}`;ncssh $home_target; }
+
+###### GO DIRECTLY TO ACCESS PORT CONNECTED ######
+warp() { target=`findhost $1 | grep access`; echo $target | cut -d ":" -f 1; echo $target | cut -d "," -f 2;ncssh `echo $target | cut -d ":" -f 1`; }
+
+
+alias chs='cdb host show'
+alias cns='cdb netblock show'
+
+###### Hydra Finder ######
+hydra() { 
+
+currentdir=`pwd`
+
+
+if [[ -z "$1" ]]
+
+then
+
+                        echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""
+                        echo "To list hydra with regex search:"
+                        echo "hydra <regex>"
+                        echo ""
+			echo "To get a list of devices with hydra connection and connect to it via console:"
+                        echo "hydra -c <device name regex>"
+
+elif [[ -z "$2" ]] && ! [[ $1 == "-c" ]]
+
+then
+	lsd hydra | grep $1
+else
+
+OPTIND=1;
+
+flag=null
+
+while getopts ":c" arg;
+do
+        case "${arg}" in
+                c)
+			rm -rf ~/hydra_port.temp
+			grep -H $2 /usr/local/google/flute/g4/hydra_conf/* | cut -d "/" -f 8- | grep -v "pslave\|FREE" | sed 's/conf.//' | sed 's/.serverfarm//' | sed 's/:/ /' | tr -s " " > ~/hydra_port.temp
+		 	rm -rf ~/hydra_search.temp
+			cat ~/hydra_port.temp | awk {'print $3'} > ~/hydra_search.temp 
+			hydra_count=`cat ~/hydra_port.temp | wc -l`
+			if [ $hydra_count -gt 1 ]
+			then	
+			clear
+			echo "Multiple Hydras found for input!"
+			echo ""
+			hydra_counter=0
+			for h in `cat ~/hydra_search.temp`
+				do
+					hydra_counter=$((hydra_counter+1))
+					echo -e "\e[1m$hydra_counter)\e[0m"
+                        		echo $h
+					echo ""
+				done
+
+			read -p "Choose device to login via console: " hydra_index
+	 		device=`cat ~/hydra_port.temp | head -$hydra_index | tail -1 | awk {'print $3'}`
+			hydra=`cat ~/hydra_port.temp | head -$hydra_index | tail -1 | awk {'print $1'}`
+			port=`cat ~/hydra_port.temp | head -$hydra_index | tail -1 | awk {'print $2'} | sed 's/s//'`
+			clear
+			echo -e "Possesing \e[1m$device\e[0m via" 
+			echo -e "hydra: \e[1m$hydra\e[0m"
+			echo -e "port: \e[1m$port\e[0m"
+			sleep 3
+			echo "Please enter root password for hydra..."
+			ssh -t -t root@$hydra "picocom -b 9600 /dev/ttyS$port"
+			
+			elif [[ -z "$2" ]]
+                       	then
+			echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""
+                        echo "To list hydra with regex search:"
+                        echo "hydra <regex>"
+                        echo ""
+                        echo "To get a list of devices with hydra connection and connect to it via console:"
+                        echo "hydra -c <device name regex>"
+			
+			else
+			device`cat ~/hydra_port.temp | awk {'print $3'}`
+			hydra=`cat ~/hydra_port.temp | awk {'print $1'}`
+			port=`cat ~/hydra_port.temp | awk {'print $2'} | sed 's/s//'`
+
+                        clear
+                        echo -e "Possesing \e[1m$device\e[0m via"
+                        echo -e "hydra: \e[1m$hydra\e[0m"
+                        echo -e "port: \e[1m$port\e[0m"
+			echo "Please enter root password for hydra..."
+                        sleep 3
+                        ssh -t -t root@$hydra "picocom -b 9600 /dev/ttyS$port"
+		
+			fi;;
+		*)
+		        echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""
+                        echo "To list hydra with regex search:"
+                        echo "hydra <regex>"
+                        echo ""
+			echo "To get a list of devices with hydra connection and connect to it via console:"
+                        echo "hydra -c <device name regex>"
+
+	esac
+
+done
+		
+fi
+
+
+
+cd $currentdir
+rm -rf ~/hydra_search.temp ~/hydra_port.temp 
+
+}
+
+
+
+###### Zombie Finder ######
+zombie() {
+
+zombie_count=`lsd ^zombie | grep $1 | wc -l`
+
+
+#Choose zombie
+if [ $zombie_count -gt 1 ]
+        then
+        zombie_counter=0
+        clear
+        echo Healthcheck for zombie in $1
+        echo ""
+        lsd ^zombie | grep $1 > ~/tempfile; fping < ~/tempfile; rm -rf ~/tempfile
+        echo ""
+        echo "Multiple zombies found in $1"
+        for z in `lsd ^zombie | grep $1`
+                do
+                        zombie_counter=$((zombie_counter+1))
+                        echo "$zombie_counter)"
+                        grep -A 2 $z /usr/local/google/flute/z.flute
+                        echo ""
+                done
+
+        read -p "Choose zombie to login to (hit 'ctrl + z' to exit): " zombie_index
+
+        zombie=`lsd ^zombie | grep $1 | head -$zombie_index | tail -1`
+
+else
+        zombie=`lsd ^zombie | grep $1`
+
+fi
+
+echo ""
+
+sleep 1
+
+if [[ -z $zombie ]]
+        then
+                echo "No zombie found in $1"
+        else
+                echo "Possesing $zombie..."
+                ncssh $zombie
+fi
+
+}
+
+######Get device list from Flute######
+lsd() {
+
+if [[ -z "$1" ]]
+
+then
+
+                        echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""
+                        echo "To list corp managed network devices:"
+                        echo "lsd <regex>"
+                        echo ""
+                        echo "To list corp managed network devices with vendor tagging:"
+                        echo "lsd -t <regex 1> <&& regex 2>"
+                        echo ""
+                        echo "To list all devices recorded in Corp Database"
+                        echo "lsd -a <regex 1> <&& regex 2>"
+                        echo "*** regex 2 is optional"
+elif [[ -z "$2" ]] && ! [[ $1 == "-t" || $1 == "-a" ]]
+
+then
+
+        grep $1 /usr/local/google/flute/c.flute;
+else
+
+OPTIND=1;
+
+flag=null
+
+while getopts ":a:t" arg;
+do
+        case "${arg}" in
+                a)
+                        flutefile=a.flute
+                        flag=allortag ;;
+                t)
+                        flutefile=t.flute
+                        flag=allortag ;;
+
+                esac
+
+done
+
+case "$flag" in
+        "allortag")
+
+                if [[ ! -z "$4" || -z "$2" ]]
+                then
+
+                        echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""
+                        echo "To list corp managed network devices:"
+                        echo "lsd <regex>"
+                        echo ""
+                        echo "To list corp managed network devices with vendor tagging:"
+                        echo "lsd -t <regex 1> <&& regex 2>"
+                        echo ""
+                        echo "To list all devices recorded in Corp Database"
+                        echo "lsd -a <regex 1> <&& regex 2>"
+                        echo "*** regex 2 is optional"
+                elif [[ -z "$3" ]]
+                then
+                        grep $2 /usr/local/google/flute/$flutefile
+                else
+                        grep $2 /usr/local/google/flute/$flutefile | grep $3
+                fi ;;
+
+        "null")
+
+                        echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""
+                        echo "To list corp managed network devices:"
+                        echo "lsd <regex>"
+                        echo ""
+                        echo "To list corp managed network devices with vendor tagging:"
+                        echo "lsd -t <regex 1> <&& regex 2>"
+                        echo ""
+                        echo "To list all devices recorded in Corp Database"
+                        echo "lsd -a <regex 1> <&& regex 2>"
+                        echo "*** regex 2 is optional" ;;
+esac
+
+fi
+
+}
+
+
+###### Tag device list with correct vendor as per CHIPMUNK ######
+
+tag() { grep -f $1 /usr/local/google/flute/t.flute > $1.tagged; echo "Output redirected to file: $1.tagged" ; }
+
+
+###### CHECK RANCID CONFIGURATION OF DEVICE/s ######
+rancid() {
+currentdir=`pwd`
+cd /usr/local/google/flute/g4/rancid_corp
+for i in `find . -name "*$1*"`
+        do
+                echo ""
+                echo "==========================================="
+                echo $i | cut -d "/" -f 3-
+                echo "==========================================="
+                grep -H "[.]*" $i
+                echo ""
+                echo ""
+        done
+cd $currentdir;
+}
+
+
+###### Go to Directory for NOC tools ######
+alias tool="cd /google/data/ro/projects/netopscorp/"
+
+
+
+
+
+###### FPING to devices ######
+fartping () {
+
+if [[ -z "$1" ]]
+
+then
+
+                        echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""
+                        echo "To check connectivity for corp managed network devices:"
+                        echo "fartping <regex>"
+                        echo ""
+                        echo "To check connectivity for devices recorded in Corp Database"
+                        echo "fartping -a <regex 1> <&& regex 2>"
+                        echo "*** regex 2 is optional"
+                        echo ""
+                        echo "To create own list:"
+                        echo "fartping -l"
+                        echo "You will enter vi mode once command is executed. Enter and save your device list."
+
+elif [ -z "$2" ] && ! [[ $1 == "-l" || $1 == "-a" ]]
+
+then
+
+        lsd $1 > ~/fartping.tmp; fping < ~/fartping.tmp; rm -rf ~/fartping.tmp;
+
+else
+
+OPTIND=1;
+
+flag=null
+
+while getopts ":a:l" arg;
+do
+        case "${arg}" in
+                a)
+                        flag=all;;
+
+                l)
+                        flag=list;;
+
+        esac
+
+done
+
+case "$flag" in
+        "all")
+
+                if [[ ! -z "$4" || -z "$2" ]]
+                then
+
+                        echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""
+                        echo "To check connectivity for corp managed network devices:"
+                        echo "fartping <regex>"
+                        echo ""
+                        echo "To check connectivity for devices recorded in Corp Database"
+                        echo "fartping -a <regex 1> <&& regex 2>"
+                        echo "*** regex 2 is optional"
+                        echo ""
+                        echo "To create own list:"
+                        echo "fartping -l"
+                        echo "You will enter vi mode once command is executed. Enter and save your device list."
+
+
+
+
+
+                elif [[ -z "$3" ]]
+                then
+                        lsd -a $2 > ~/fartping.tmp; fping < ~/fartping.tmp; rm -rf ~/fartping.tmp;
+
+                else
+
+                        lsd -a $2 $3 > ~/fartping.tmp; fping < ~/fartping.tmp; rm -rf ~/fartping.tmp;
+
+                fi ;;
+
+
+        "list")
+                rm -rf ~/.fartlist.temp.swp
+                rm -rf ~/.fartlist.temp
+                vi ~/fartlist.temp
+                fping < ~/fartlist.temp
+                rm -rf ~/fartlist.temp;;
+
+
+
+        "null")
+
+			echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""
+                        echo "To check connectivity for corp managed network devices:"
+                        echo "fartping <regex>"
+                        echo ""
+                        echo "To check connectivity for devices recorded in Corp Database"
+                        echo "fartping -a <regex 1> <&& regex 2>"
+                        echo "*** regex 2 is optional"
+                        echo ""
+                        echo "To create own list:"
+                        echo "fartping -l"
+                        echo "You will enter vi mode once command is executed. Enter and save your device list.";;
+esac
+
+fi
+
+}
+
+###### Check for bgp peering that flapped within 24 hours ######
+
+bgpcheck () {
+
+rm -rf ~/bgpcheckdir
+rm -rf ~/bgpcheck_temp.cmd
+
+mkdir -p ~/bgpcheckdir
+echo "show bgp summary | no-more" > ~/bgpcheck_temp.cmd
+echo "show bgp neighbor | no-more" >> ~/bgpcheck_temp.cmd
+
+ncpush --noreviewlogs --session_logdir ~/bgpcheckdir --device $1:juniper ~/bgpcheck_temp.cmd > /dev/null
+
+cat -v ~/bgpcheckdir/$1 | sed -e 's/\^M//' > ~/bgpcheckdir/$1.temp
+
+mv ~/bgpcheckdir/$1.temp ~/bgpcheckdir/$1
+
+echo ""
+echo 'Result of show bgp summary'
+echo ""
+echo "Recently established Peers (recently up < 24 hrs):"
+echo ----------------------------------------------------------------------------
+cat ~/bgpcheckdir/$1 | grep Establ$ | grep -v "[ ]\+[0-9]\+[dw]"
+echo ""
+echo ""
+echo "Peers in other BGP states (recently down < 24 hrs):"
+echo ----------------------------------------------------------------------------
+cat ~/bgpcheckdir/$1 | grep "Connect$\|Active$\|Idle$" | grep -v "InPkt\|[ ]\+[0-9]\+[dw]"
+echo ""
+echo ""
+echo "Peers not able to establish for more than 24 hours already:"
+echo ----------------------------------------------------------------------------
+cat ~/bgpcheckdir/$1 | grep "Connect$\|Active$\|Idle$" | grep "[ ]\+[0-9]\+[dw]" | grep -v "InPkt"
+echo ""
+echo ""
+echo "NOC NOTES:"
+echo "The recently established/down peers must contain no entries as a sign of stability."
+echo "For peers not able to establish for more than 24 hours, please investigate or check if BGP configurations are still valid for the neighbor."
+
+
+echo ""
+echo ""
+echo ""
+echo "***************************************************************"
+echo "Additional information for down peers"
+echo "***************************************************************"
+echo ""
+
+cat ~/bgpcheckdir/$1 | grep "Connect$\|Active$\|Idle$" | grep -v "InPkt\|[ ]\+[0-9]\+[dw]" > /dev/null
+if [ $? -eq 0 ]
+        then
+        echo "recently down < 24 hrs"
+        for peer in `cat ~/bgpcheckdir/$1 | grep "Connect\|Active$\|Idle" | grep -v "InPkt\|[ ]\+[0-9]\+[dw]" | awk {'print $1'}`
+                do
+                        grep -A 1 "Peer: $peer[+ ]" ~/bgpcheckdir/$1
+                done
+
+
+
+echo ""
+fi
+
+cat ~/bgpcheckdir/$1 | grep "Connect$\|Active$\|Idle$" | grep "[ ]\+[0-9]\+[dw]" | grep -v "InPkt" > /dev/null
+if [ $? -eq 0 ]
+        then
+        echo "Down for > 24 hrs"
+        for peer in `cat ~/bgpcheckdir/$1 | grep "Connect$\|Active$\|Idle$" | grep "[ ]\+[0-9]\+[dw]" | grep -v "InPkt" | awk {'print $1'}`
+                do
+                        grep -A 1 "Peer: $peer[+ ]" ~/bgpcheckdir/$1
+                done
+fi
+
+rm -rf ~/bgpcheckdir
+rm -rf ~/bgpcheck_temp.cmd
+
+}
+###### Ipsla Check ######
+ipsla() {
+
+ipsla_source_count=`lsd ipsla | grep $1 | wc -l`
+ipsla_responder_count=`lsd ipsla | grep $2 | wc -l`
+
+#Choose ipsla source
+if [ $ipsla_source_count -gt 1 ]
+        then
+        counter=0
+        clear
+        echo "FOUND MULTIPLE IPSLA's FOR $1"
+        for ipslasrc in `lsd ipsla | grep $1`
+                do
+                        counter=$((counter+1))
+                        echo "$counter)"
+                        echo $ipslasrc
+                        echo ""
+                done
+
+        read -p "Choose ipsla: " source_index
+
+        source=`lsd ipsla | grep $1 | head -$source_index | tail -1`
+
+else
+        source=`lsd ipsla | grep $1`
+
+fi
+
+#choose ipsla responder
+if [ $ipsla_responder_count -gt 1 ]
+        then
+        counter=0
+        clear
+        echo "FOUND MULTIPLE IPSLA's FOR $2"
+        for ipsladst in `lsd ipsla | grep $2`
+                do
+                        counter=$((counter+1))
+                        echo "$counter)"
+                        echo $ipsladst
+                        echo ""
+                done
+
+        read -p "Choose ipsla: " responder_index
+
+        responder=`lsd ipsla | grep $2 | head -$responder_index | tail -1`
+
+else
+        responder=`lsd ipsla | grep $2`
+
+fi
+
+clear
+echo Source ipsla: $source
+echo Responder ipsla: $responder
+
+
+#get show ip sla summary to responder
+
+
+rm -rf ipslatempdir
+mkdir ipslatempdir
+ncpush --noreviewlogs --session_logdir ipslatempdir --device $source:cisco --command "show ip sla summary destination $responder" > /dev/null
+cat ipslatempdir/$source | grep -A 1000 "show ip sla" | grep -v exit
+rm -rf ipslatempdir
+}
+
+
+###### To clean stale SSH Key ######
+cleanhost () { sed -i ~/.ssh/known_hosts -e "$1d" ~/.ssh/known_hosts; }
+
+###### blaze dhcp tshoot tool ######
+blazed () { cd /google/src/files/head/depot/google3; blaze run ops/cisre/corpdhcp/cdb_helper -- --address $1; }
+
+
+
+
+
+
+
+###### HPING3 from zombie to zombie ######
+zing() {
+z_source_count=`lsd ^zombie | grep $1 | wc -l`
+z_responder_count=`lsd ^zombie | grep $2 | wc -l`
+
+if [[ $3 -gt 4 ]]
+        then
+        echo Incorrect parameter!!!
+        echo "format is: zing <source site> <destination site> <1-4>"
+        echo 1 for AF1
+        echo 2 for AF2
+        echo 3 for AF3
+        echo 4 for AF4
+        echo No value means all AF1 to AF4
+        exit
+
+
+else
+
+
+#Choose source zombie
+if [ $z_source_count -gt 1 ]
+        then
+        zs_counter=0
+        clear
+        echo Healthcheck for zombie in $1
+        echo ""
+        lsd ^zombie | grep $1 > tempfile; fping < tempfile; rm -rf tempfile
+        echo ""
+        echo "FOUND ZOMBIE PARTY IN $1"
+        for z in `lsd ^zombie | grep $1`
+                do
+                        zs_counter=$((zs_counter+1))
+                        echo "$zs_counter)"
+                        grep -A 2 $z /usr/local/google/flute/z.flute
+                        echo ""
+                done
+
+        read -p "Choose your zombie wisely: " z_source_index
+
+        z_source=`lsd ^zombie | grep $1 | head -$z_source_index | tail -1`
+
+else
+        z_source=`lsd ^zombie | grep $1`
+
+fi
+
+
+#Choose responder zombie
+if [ $z_responder_count -gt 1 ]
+        then
+        zr_counter=0
+        clear
+        echo Healthcheck for zombie in $2
+        echo ""
+        lsd ^zombie | grep $2 > tempfile; fping < tempfile; rm -rf tempfile
+        echo ""
+        echo "FOUND ZOMBIE PARTY IN $2"
+        for z in `lsd ^zombie | grep $2`
+                do
+                        zr_counter=$((zr_counter+1))
+                        echo "$zr_counter)"
+                        grep -A 2 $z /usr/local/google/flute/z.flute
+                        echo ""
+                done
+
+        read -p "Choose your zombie wisely: " z_responder_index
+
+        z_responder=`lsd ^zombie | grep $2 | head -$z_responder_index | tail -1`
+
+else
+        z_responder=`lsd ^zombie | grep $2`
+
+fi
+
+
+clear
+echo Source Zombie: $z_source
+echo Responder Zombie: $z_responder
+
+if [[ -z "$3" ]]
+
+then
+        echo hping3 to port: 10171 - 10174
+        ssh -t $z_source "echo AF1:; sudo hping3 $z_responder --destport 10171 -c 100 --fast -q -m 1500; echo AF2:; sudo hping3 $z_responder --destport 10172 -c 100 --fast -q -m 1500; echo AF3:; sudo hping3 $z_responder --destport 10173 -c 100 --fast -q -m 1500; echo AF4:; sudo hping3 $z_responder --destport 10174 -c 100 --fast -q -m 1500;"
+
+elif [[ $3 == 1 ]]
+
+then
+        echo hping3 to port: 1017$3
+        ssh -t $z_source "echo AF1:; sudo hping3 $z_responder --destport 10171 -c 100 --fast -q -m 1500;"
+
+elif [[ $3 == 2 ]]
+
+then
+        echo hping3 to port: 1017$3
+        ssh -t $z_source "echo AF2:; sudo hping3 $z_responder --destport 10172 -c 100 --fast -q -m 1500;"
+
+elif [[ $3 == 3 ]]
+
+then
+        echo hping3 to port: 1017$3
+        ssh -t $z_source "echo AF3:; sudo hping3 $z_responder --destport 10173 -c 100 --fast -q -m 1500;"
+
+elif [[ $3 == 4 ]]
+
+then
+        echo hping3 to port: 1017$3
+        ssh -t $z_source "echo AF4:; sudo hping3 $z_responder --destport 10174 -c 100 --fast -q -m 1500;"
+
+else
+        echo Incorrect parameter!!!
+        echo "format is: zing <source site> <destination site> <1-4>"
+        echo 1 for AF1
+        echo 2 for AF2
+        echo 3 for AF3
+        echo 4 for AF4
+        echo No value means all AF1 to AF4
+fi
+fi
+}
+
+
+###### Checks for portchannels and checks for secondary portchannels for all cisco core, access, aggregation devices ######
+
+spotpo() {
+
+lsd -t $1 | grep "accsw\|agg\|core" | grep cisco > spotpo.list
+
+rm -rf spo1tempdir
+mkdir spo1tempdir
+ncpush --noreviewlogs --session_logdir spo1tempdir --devicefile spotpo.list --command "show interface description | inc Po[1-9]"
+
+cd spo1tempdir
+
+
+echo "Found port channels (non secondary):"
+echo "--------------------------------------------------------"
+grep -i "po[0-9]" * | grep -vi "Po[0-9][a-zA-Z]\+"
+
+echo ""
+echo ""
+echo "Found secondary ports:"
+echo "--------------------------------------------------------"
+grep -i "Po[0-9][a-zA-Z]" *
+
+cd ..
+
+rm -rf spo1tempdir
+rm -rf spotpo.list
+}
+
+###### Bulk add IPDB attribute to netblocks on file all in propose ######
+# ipdb_bulk_add <file containing list for netblocks> <'additional attribute'>
+# example: ipdb_bulk_add netblock.list 'tag: "ACL-CORP-MPS"'
+
+ipdb_bulk_add() {
+rm -rf ipdb_proposal_dir
+mkdir ipdb_proposal_dir
+sudo rm -rf /tmp/*
+
+for netblock in `cat $1`
+do
+        ipdb_client --generate_textproto search $netblock
+done
+
+sudo find /tmp -name *before | xargs sudo mv -t ./ipdb_proposal_dir/
+sudo find /tmp -name *after | xargs sudo mv -t ./ipdb_proposal_dir/
+
+for i in `ls ./ipdb_proposal_dir/*after`; do echo "$2" >>  $i; done
+
+ipdb_client apply ./ipdb_proposal_dir
+
+}
+
+
+###### Check for the latest version of the ACL/JCL ######
+aclcheck () {
+
+
+if [[ -z "$1" ]]
+
+then
+
+                        echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""
+                        echo "To check version details of ACL's/JCL's by exact name"
+                        echo "aclcheck <exact name of ACL/JCL>"
+                        echo ""
+                        echo "To display contents of ACL's/JCL's by exact name"
+                        echo "aclcheck -d <regex>"
+                        echo ""
+                        echo "To check version details of ACL's/JCL's with names matching regex:"
+                        echo "aclcheck -r <regex>"
+			echo ""
+			echo "To audit ACL's/JCL's for a specific device:"
+                        echo "aclcheck -a <specific device name>"
+	
+elif [[ -z "$2" ]] && ! [[ $1 == "-d" || $1 == "-r" || $1 == "-a" ]]
+
+then
+	find /usr/local/google/flute/g4/acl_* -name "$1" | xargs grep -A 2 -m 1 $1 | sed 's/^ *//'
+else
+
+
+OPTIND=1;
+
+
+while getopts ":d:r:a" arg;
+do
+        case "${arg}" in
+                d)
+                find /usr/local/google/flute/g4/acl_* -name "$2" | xargs cat;;
+
+
+		r)
+		find /usr/local/google/flute/g4/acl_* -name "*$2*" | xargs grep -A 2 -m 1 $2 | sed 's/^ *//';;
+                
+		
+		a)
+		currentdir=`pwd`
+		device_tagged=`lsd -t $2 | head -1`
+		tag=`echo $device_tagged | cut -d ":" -f 2`
+
+		rm -rf ~/aclchecktestdir
+		mkdir ~/aclchecktestdir
+
+		if [[ $tag == "cisco" ]]
+		then
+			rm -rf ~/aclchecktest.cmd
+			echo "terminal length 0" > ~/aclchecktest.cmd
+			echo "show run" >> ~/aclchecktest.cmd
+
+ 		ncpush --noreviewlogs --session_logdir ~/aclchecktestdir --device $device_tagged ~/aclchecktest.cmd
+
+
+                cd ~/aclchecktestdir
+
+                clear
+
+                echo "Auditing ACLs existing for $2"
+                echo ""
+
+
+                for i in `cat $2 | grep remark | grep acl | rev | cut -d "/" -f 1 | rev | awk {'print $1'} | grep "\.acl#" | sort | uniq`
+                        do
+                                acl=`echo $i | cut -d '#' -f 1`
+                                echo "ACL version on device:"
+                                echo $i
+                                echo ""
+                                echo "ACL version on Release Branch:"
+                                echo "============================================"
+                                aclcheck $acl
+                                echo "============================================"
+                                echo ""
+                                echo ""
+                        done
+		                
+		cd $currentdir
+		
+		elif [[ $tag == "juniper" ]]
+		then
+                        rm -rf ~/aclchecktest.cmd
+                        echo "set cli screen-length 1000" > ~/aclchecktest.cmd
+                        echo "show configuration" >> ~/aclchecktest.cmd
+
+
+                ncpush --noreviewlogs --session_logdir ~/aclchecktestdir --device $device_tagged ~/aclchecktest.cmd
+
+
+                cd ~/aclchecktestdir
+
+                clear
+
+                echo "Auditing ACLs existing for $2"
+                echo ""
+
+                for i in `cat $2 | grep "j[cs]l#\|srx#" | rev | cut -d "/" -f 1 | rev | awk {'print $1'} | grep "j[cs]l#\|srx#" | sort | uniq`
+                        do
+                                jcl=`echo $i | cut -d '#' -f 1`
+                                echo "JCL version on device:"
+                                echo $i
+                                echo ""
+                                echo "JCL version on Release Branch:"
+                                echo "============================================"
+                                aclcheck $jcl
+                                echo "============================================"
+                                echo ""
+                                echo ""
+                        done
+		
+		cd $currentdir
+
+		else 
+			echo "The audit only works for Juniper and Cisco devices. Kindly check device input."
+			echo "Exiting aclcheck audit!"
+		fi;;
+			
+
+
+		*)
+                        echo "Incorrect usage!"
+                        echo ""
+                        echo Usage:
+                        echo ""                        echo "To check version details of ACL's/JCL's by exact name"
+                        echo "aclcheck <exact name of ACL/JCL>"
+                        echo ""
+                        echo "To display contents of ACL's/JCL's by exact name"
+                        echo "aclcheck -d <regex>"
+                        echo ""
+                        echo "To check version details of ACL's/JCL's with names matching regex:"
+			echo "aclcheck -r <regex>"	
+			echo ""
+                        echo "To audit ACL's/JCL's for a specific device:"
+                        echo "aclcheck -a <specific device name>"
+
+	esac
+done
+
+fi
+}
+
+
+
+###### Find alive host in a netblock ######
+hostfind () {
+echo "Searching for alive hosts in netblock"
+fping -Agns $1 | grep alive | awk {'print $1'} | grep google.com | tee ~/findhost.list
+echo ""
+echo ""
+
+sleep 2
+
+echo "Searching access ports for alive hosts..."
+sleep 1
+echo ""
+for i in `cat ~/findhost.list`
+        do
+                echo $i :
+                findhost $i | grep access
+                echo "==================================="
+        done
+rm -rf ~/findhost.list
+
+echo "Done with host finding!!!"
+}
+
+
+###### Bounce all runt ports for requested device list ######
+
+runtcide () {
+
+clear
+
+currentdir=`pwd`
+rm -rf ~/runtlogs
+mkdir ~/runtlogs
+
+
+rm -rf ~/runtcmds_shut
+mkdir ~/runtcmds_shut
+
+rm -rf ~/runtcmds_noshut
+mkdir ~/runtcmds_noshut
+
+rm -rf ~/runtdevices.list
+
+read -p 'Please press "enter" and list all devices you will perform the runt port bounce...'
+
+vi ~/runtdevices.list
+tag  ~/runtdevices.list
+mv ~/runtdevices.list.tagged ~/runtdevices.list
+
+
+echo "Retrieving runt ports for requested devices..."
+echo ""
+ncpush --noreviewlogs --session_logdir ~/runtlogs --devicefile  ~/runtdevices.list --command "show interface status"
+
+echo "Done retrieving runt ports!!!"
+
+cd ~/runtlogs
+
+echo ""
+echo Below are the runt ports on requested devices:
+echo ""
+
+for i in `ls`
+        do
+                echo $i
+                interface=`grep "connect.\+ 2[23][0-9] " $i | awk {'print $1'}`
+                echo $interface
+                echo
+        done
+
+
+for i in `ls`
+        do
+                echo configure terminal >> ~/runtcmds_shut/$i
+                echo ! >> ~/runtcmds_shut/$i
+                interface=`grep "connect.\+ 2[23][0-9] " $i | awk {'print $1'}`
+                for x in `echo $interface`
+                        do
+                                echo interface $x >> ~/runtcmds_shut/$i
+                                echo ! >> ~/runtcmds_shut/$i
+                                echo shut >> ~/runtcmds_shut/$i
+                                echo ! >> ~/runtcmds_shut/$i
+                        done
+        done
+
+
+
+        for i in `ls`
+        do
+                echo configure terminal >> ~/runtcmds_noshut/$i
+                echo ! >> ~/runtcmds_noshut/$i
+                interface=`grep "connect.\+ 2[23][0-9] " $i | awk {'print $1'}`
+                for x in `echo $interface`
+                        do
+                                echo interface $x >> ~/runtcmds_noshut/$i
+                                echo ! >> ~/runtcmds_noshut/$i
+                                echo no shut >> ~/runtcmds_noshut/$i
+                                echo ! >> ~/runtcmds_noshut/$i
+                        done
+        done
+
+
+
+
+rm -rf ~/runtlogs_cmd
+mkdir ~/runtlogs_cmd
+
+
+echo "Shutting down runt ports for requested devices..."
+
+sleep 2
+
+ncpush --noreviewlogs --session_logdir ~/runtlogs_cmd --devicefile  ~/runtdevices.list --cmd_dir ~/runtcmds_shut
+
+
+echo "Keeping the runt ports shutdown for a few seconds..."
+
+sleep 30 
+
+echo "Bringing up the runt ports that were shutdown..."
+
+
+ncpush --noreviewlogs --session_logdir ~/runtlogs_cmd --devicefile  ~/runtdevices.list --cmd_dir ~/runtcmds_noshut
+
+
+rm -rf ~/runtlogs_after
+mkdir ~/runtlogs_after
+
+
+echo "Retrieving runt ports for requested devices after runt ports bounce..."
+echo ""
+
+
+ncpush --noreviewlogs --session_logdir ~/runtlogs_after --devicefile  ~/runtdevices.list --command "show interface status"
+
+echo "Done retrieving runt ports!!!"
+echo ""
+
+cd ~/runtlogs_after
+
+
+echo Below are the runt ports that remained on requested devices:
+
+for i in `ls`
+        do
+                echo $i
+                interface=`grep "connect.\+ 2[23][0-9] " $i | awk {'print $1'}`
+                echo $interface
+                echo ""
+        done
+
+
+cd $currentdir
+
+rm -rf ~/runtdevices.list ~/runtlogs ~/runtcmds_shut ~/runtcmds_noshut ~/runtlogs_cmd ~/runtlogs_after
+
+echo "Done!!!"
+
+}
+
+
+####### Split first column from the rest ######
+alias splitfirst='clear; vi split.temp; echo "=============================================="; cat split.temp | cut -d" " -f1; echo "=============================================="; cat split.temp | cut -d" " -f2- | sed -e "s/^[ \t]*//"; rm -rf split.temp'
+
+
+
+###### Delete target netblock from CDB and IPDB ###### 
+
+deblock() {
+
+if [[ -z "$2" ]]
+
+then
+
+echo "Incorrect usage!!!
+
+Usage:
+
+deblock <target IPv4 or IPv6 netblock> <LDAP of approver for IPDB>"
+
+else
+
+echo "Deleting registered hosts on CDB for the netblock..."
+
+for i in `cdb host list netrange:$1 | grep google.com | awk {'print $1'}`
+	do
+		cdb host delete $i --no-confirm
+	done
+
+echo "Deleting requested netblock in CDB..."
+
+cdb netblock delete $i --no-confirm
+
+echo Done!!!
+
+
+
+
+rm -rf ~/override_ipdb.log
+
+
+echo "Overriding IPDB to allow to delete netblock..."
+ipdb_client --generate_textproto search $1 > ~/override_ipdb.log
+
+APPLY_OVERRIDE_DIR=`cat ~/override_ipdb.log | grep "ipdb_client apply" | awk {'print $3'}`
+
+cd $APPLY_OVERRIDE_DIR
+
+for i in `ls *after`
+	do
+		echo "attribute {
+  name: \"sotw_delete_override_ref\"
+  value: \"deblock script\"
+}
+attribute {
+  name: \"corp_delete_parent_override_ref\"
+  value: \"deblock script\"
+}" >> $i
+	done
+
+
+echo "Submitting override proposal to $2"
+
+ipdb_client --propose --reviewer="$2" apply $APPLY_OVERRIDE_DIR
+
+read -p 'Please press "enter" and once the override proposal is approved...'
+
+
+echo "Submitting netblock deletion proposal to $2..."
+
+ipdb_client --propose --reviewer="$2" delete $1
+
+fi
+
+}
+
+
+
+
+
+###### Get DHCP information for a device(hostname or MAC), IP, or Netblock ######
+
+getdhcp() {
+
+if [[ -z $1 ]]
+
+then
+
+echo "Incorrect Usage!!!
+
+Usage:
+
+getdhcp \"<IP address || MAC Address || Netblock || Hostname >\"
+
+MAC Address can be any of the following:
+xx.xx.xx.xx.xx.xx
+XX.XX.XX.XX.XX.XX
+xxxx.xxxx.xxxx
+"
+
+else
+
+if [[ $1 =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ || $1 =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]
+
+then
+        target=$1
+
+elif [[ $1 =~ ^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$ || $1 =~ ^[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{2}$ || $1 =~ ^[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4}$ ]]
+
+then
+        target_temp=`morph -S $1`
+        target=`cdb host show $target_temp | grep "IPv4 Address" | awk {'print $4'}`
+else
+        target=`nslookup $1 | grep Address | tail -1 | awk {'print $2'}`
+
+fi
+
+
+        wget -4 -q -O ~/getdhcp.tmp http://dhcp-router1-1.cbf.corp.google.com:16767/lookup?ip=$target > /dev/null;
+
+clear
+
+
+echo "Queried: $1"
+echo "Actual Target IP/netblock: $target"
+echo ""
+
+
+cat ~/getdhcp.tmp
+
+primary_dhcp=`grep "Server IP" ~/getdhcp.tmp | awk {'print $3'} | head -1`
+secondary_dhcp=`grep "Server IP" ~/getdhcp.tmp | awk {'print $3'} | tail -1`
+
+
+echo ""
+echo ""
+echo "1.) Go to Primary DHCP server."
+echo "2.) Go to Secondary DHCP server."
+echo ""
+echo "Press any other key to exit."
+echo ""
+read -p "Enter choice: " promptval
+
+case "$promptval" in
+        "1")
+        ssh $primary_dhcp;;
+        "2")
+        ssh $secondary_dhcp;;
+        *)
+        echo "Exiting..."
+esac
+
+
+
+rm -rf ~/getdhcp.tmp
+
+fi
+}
+
+###### Unencrypt common password repository ######
+alias hush='echo :q! to exit; ssh -t noc5.mnl "gpg /usr/local/google/home/arturomiranda/hush/hush.gpg ;vi /usr/local/google/home/arturomiranda/hush/hush; echo Removing unencrypted file...; rm -rf /usr/local/google/home/arturomiranda/hush/hush"'
+
+###### Silence alerts for device/s ######
+mute () {
+	    if [[ -z "$1" ]]
+	    	then
+	    		rm -rf ~/mute.list
+	    		read -p 'Please press "enter" and list all devices you will need to silence alerts...'
+	    		vi ~/mute.list
+	    		echo "Kindly confirm device/s below:"
+	    		cat ~/mute.list
+	    		read -p 'Please press "enter" to continue or "ctrl + c" to exit...'
+
+	    elif [[ -f "$1" ]]
+	    	then 
+	    		rm -rf ~/mute.list
+	    		cp $1 ~/mute.list
+	    		echo "Kindly confirm device/s below:"
+	    		cat ~/mute.list
+	    		read -p 'Please press "enter" to continue or "ctrl + c" to exit...'
+
+	    else
+	    	lsd $1 > ~/mute.list
+	    	echo "Kindly confirm device/s below:"
+	    	cat ~/mute.list
+	    	read -p 'Please press "enter" to continue or "ctrl + c" to exit...'
+
+	    fi
+
+	for i in `cat ~/mute.list`
+		do
+			echo "Silencing $i..."
+			chipmunkutil device $i alertable="false"
+			echo ""
+		done
+		
+rm -rf ~/mute.list
+
+}
+
+###### Turn on alerts for device/s ######
+unmute () {
+            if [[ -z "$1" ]]
+                then
+                        rm -rf ~/mute.list
+                        read -p 'Please press "enter" and list all devices you will need to turn on alerts...'
+                        vi ~/mute.list
+                        echo "Kindly confirm device/s below:"
+                        cat ~/mute.list
+                        read -p 'Please press "enter" to continue or "ctrl + c" to exit...'
+
+            elif [[ -f "$1" ]]
+                then
+                        rm -rf ~/mute.list
+                        cp $1 ~/mute.list
+                        echo "Kindly confirm device/s below:"
+                        cat ~/mute.list
+                        read -p 'Please press "enter" to continue or "ctrl + c" to exit...'
+
+            else
+                lsd $1 > ~/mute.list
+                echo "Kindly confirm device/s below:"
+                cat ~/mute.list
+                read -p 'Please press "enter" to continue or "ctrl + c" to exit...'
+
+            fi
+
+        for i in `cat ~/mute.list`
+                do
+                        echo "Turning on alerts for $i..."
+                        chipmunkutil device $i alertable="true"
+                        echo ""
+                done
+
+rm -rf ~/mute.list
+
+}
+
+
+###### MAC Vendor Look-up ######
+macvendor() {
+macfirstsix=`echo $1 | tr -d  ':.-' | cut -c -6`
+
+grep -B 1 -A 3 -i "^$macfirstsix" /usr/local/google/flute/m.flute
+}
+
+###### Locate access port of MAC address from given device/site regex######
+lookfor() {
+
+rm -rf ~/lookfor_mac.list
+
+if [[ ! -f "$1" ]]
+	then
+		morph -c $1 > ~/lookfor_mac.list
+
+else
+	for mac in `cat $1`
+	do
+		morph -c $mac >> ~/lookfor_mac.list	
+	done
+fi
+
+rm -rf ~/lookfordevice.list
+lsd -t $2 | grep "cisco\|arista" | grep -v ipsla > ~/lookfordevice.list
+
+
+rm -rf ~/lookfor_pushlogs
+rm -rf ~/lookfor_logs
+rm -rf ~/trunk_logs
+
+
+mkdir ~/lookfor_pushlogs
+mkdir ~/lookfor_logs
+mkdir ~/trunk_logs
+
+
+echo "show mac address" > ~/lookfor.cmd
+echo "show int trunk" >> ~/lookfor.cmd
+
+echo "Pulling MAC address table from device/s..."
+ncpush --noreviewlogs --session_logdir ~/lookfor_pushlogs --devicefile ~/lookfordevice.list ~/lookfor.cmd
+
+echo "Weeding out trunk ports from logs..."
+cd ~/lookfor_pushlogs
+for i in `ls`
+	do 
+		cat $i | awk {'print $1'} | grep "^Gi\|^Et\|^Te\|^Po[0-9]" | sort | uniq >> ../trunk_logs/$i
+	done
+cd ..
+
+cd ~/trunk_logs
+for i in `ls`
+	do
+		grep ^Te $i | sed 's/Te/TenGigabitEthernet/' >> $i
+		grep ^Gi $i | sed 's/Gi/GigabitEthernet/' >> $i
+		grep ^Po $i | sed 's/Po/Port-channel/' >> $i
+	done
+cd ..
+
+
+cd ~/lookfor_pushlogs
+for i in `ls`
+	do
+		grep -v -f ../trunk_logs/$i $i >> ../lookfor_logs/$i
+	done
+
+cd ..
+
+#grep -i -f ~/lookfor_mac.list ~/lookfor_logs/* | cut -d "/" -f 8- | awk {'print $1" "$3" "$6'}
+grep -i -f ~/lookfor_mac.list ~/lookfor_logs/* | cut -d "/" -f 8-
+
+rm -rf ~/lookfor_mac.list ~/lookfordevice.list ~/lookfor_pushlogs ~/trunks_pushlogs ~/trunk_logs ~/lookfor_logs
+}
+
+
+
+########################################END OF ARTSY BASH######################################################
+
+
+
+# Circa Ops Version 2.0 by Jon Pogi! ##########################################################################
+
+# Start: ######################################################################################################
+
+
+circaops () 
+
+{
+
+cat /usr/local/google/circuit.raw | sed 's/  */ /g' | tr -d ',[]' | sed  "s/'//g" > ~/temp.list
+
+echo ""
+
+if [[ $1 == *"-"* ]]
+
+then
+
+	grep --ignore-case $1 -A 8 ~/temp.list | sed "s/--//" > ~/temp.file
+
+	sleep 1
+
+	awk '
+	BEGIN   {n=split ("Location,Status,Service Type,Service Provider,ID", HD, ",")
+         	n=split ("1 6 7 8 9", FIELD)
+        	}
+        	{for (i=1; i<=n; i++) print HD[i] ":"  $FIELD[i]
+         	print ""
+        	}
+	' RS="" FS="\n" ~/temp.file | grep --ignore-case $1 -A 5
+
+else
+
+	grep --ignore-case $1 -B 8 ~/temp.list | sed "s/--//" > ~/temp.file
+
+	sleep 1
+
+	awk '
+	BEGIN   {n=split ("Location,Status,Service Type,Service Provider,ID", HD, ",")
+        	 n=split ("1 6 7 8 9", FIELD)
+        	}
+        	{for (i=1; i<=n; i++) print HD[i] ":"  $FIELD[i]
+         	print ""
+        	}
+	' RS="" FS="\n" ~/temp.file | grep --ignore-case $1 -B 5
+
+fi
+
+sleep 1
+
+rm -rf ~/temp.*
+
+echo ""
+
+}
+
+# End
+
+# Wifi Diagnostics V1.0 by Jon Pogi! ##########################################################################
+
+# Start: ######################################################################################################
+
+wifidiag ()
+
+{
+
+rm -rf ~/wmclog1
+rm -rf ~/wmclog2
+rm -rf ~/command1.list
+rm -rf ~/command2.list
+
+mkdir -p ~/wmclog1
+mkdir -p ~/wmclog2
+
+echo "show ap association client-mac $1" > ~/command1.list
+echo "show user-table unique | include $1" >> ~/command1.list
+
+ncpush --noreviewlogs --retries 5 --session_logdir ~/wmclog1 --device $2 ~/command1.list > /dev/null
+
+apname=$(cat ~/wmclog1/$2 | grep $1 | awk -F " " 'NR==3 {print $1}')
+snr=$(cat ~/wmclog1/$2 | grep SNR | awk -F " " '{print $1,$2":", $3}')
+ip=$(cat ~/wmclog1/$2 | grep -A 2 user-table | awk -F" " 'NR==3 {print $1}')
+
+echo ""
+
+echo "=================================================="
+echo "Associated AP: $apname"
+
+echo ""
+
+echo "=================================================="
+echo "$snr"
+
+echo ""
+
+echo "show user-table ap-name $apname unique | include Entries" > ~/command2.list
+echo "show ap arm history ap-name $apname" >> ~/command2.list
+echo "show datapath session | include $ip" >> ~/command2.list
+echo "show ap monitor ap-list ap-name $apname | include interfering" >> ~/command2.list
+echo "show log all | include $apname" >> ~/command2.list
+echo "show log all | include $1" >> ~/command2.list
+
+ncpush --noreviewlogs --retries 5 --session_logdir ~/wmclog2 --device $2 ~/command2.list > /dev/null
+
+data=$(cat ~/wmclog2/$2)
+
+echo ""
+
+echo "=================================================="
+echo "Additional Information:"
+
+echo ""
+
+echo "$data" | grep "User Entries" | awk -F " " '{print "'"$apname"'", $0}'
+
+echo ""
+
+echo "=================================================="
+echo "ARM History:"
+
+echo ""
+
+echo "$data" | grep  -A 20 "wifi0\|wifi1"
+
+echo ""
+
+echo "=================================================="
+echo "Interference:"
+
+echo ""
+
+echo "$data" | grep interfering
+
+echo ""
+
+echo "=================================================="
+echo "Datapath session:"
+
+echo ""
+
+echo "$data" | grep "datapath\|tunnel"
+
+echo ""
+
+echo "=================================================="
+echo "AP Logs:" 
+
+echo ""
+
+echo "$data" | grep -A 100 "show log all" | grep "$apname"
+
+echo ""
+
+rm -rf ~/wmclog1
+rm -rf ~/wmclog2
+rm -rf ~/command1.list
+rm -rf ~/command2.list
+
+echo "--------------------End of Diagnostics---------------------"
+echo ""
+
+}
+
+# End
