@@ -1,0 +1,309 @@
+#!/bin/bash
+# Bash Menu Script
+
+while true
+do
+PS3='Please enter your choice: '
+options=("Enter your Credentials" "Populate SeedFile" "ConfigBackup Tool" "Compare Tool" "IOS and FlashCheck Tool" "Run showcmds Tool" "Quit")
+clear
+select opt in "${options[@]}"
+do
+    case $opt in
+        "Enter your Credentials")
+            clear
+            echo "Please enter the VzID: "
+            read VzID
+            clear
+            echo "Please enter the tacacs pw: "
+            read tacacs
+            clear
+            echo "Please enter the snmpv3 username: "
+            read snmpuser
+            clear
+            echo "Please enter the snmpv3 community: "
+            read snmpkey
+            clear
+
+            echo "Saving Credentials..."
+            sleep 2
+            clear
+            echo "Credentials saved. Please validate"
+            echo ""
+            echo "==============================="
+            echo "VZID: $VzID"
+            echo "TACACS: $tacacs"
+            echo "SNMPv3 Username: $snmpuser"
+            echo "SNMPv3 Community: $snmpkey"
+            echo "==============================="
+            echo ""
+            echo "Hit enter if all are correct."
+            read tempo1
+
+            fullPath=/home/$VzID/BackupCFG
+            spath=/home/repos/public/.mimetool
+            vpath=/home/repos/public/tool
+            clear
+            if [ -d "$fullPath" ]
+            then
+                 echo "Backup repository folder existing"
+                                 sleep 1
+                                 clear
+            else 
+                             mkdir /home/$VzID/BackupCFG
+                             mkdir /home$VzID/DiffCFG
+                                 mkdir /home/$VzID/ReposCFG
+                                 mkdir /home/$VzID/showcmds
+                 echo "Backup repository folder created"
+                                 sleep 1
+                                 clear
+            fi
+            break
+            ;;
+
+        "Populate SeedFile")
+            clear
+            echo "To edit press 'i' -- to save press esc and write ':wq' and hit enter"
+            echo "Press enter to continue"
+            read tempo2
+            touch $spath/iplist
+            truncate -s 0 $spath/iplist
+            vi $spath/iplist
+            clear
+            echo "SeedFile Populated. Do you want to view seedfile? (y/n)"
+            read answer2
+            if [ "$answer2" == "y" ] || [ "$answer2" == "yes" ] || [ "$answer2" == "Yes" ] || [ "$answer2" == "Y" ] || [ "$answer2" == "YES" ]
+            then
+               echo "============================================================================="
+               echo ""
+               cat $spath/iplist
+               echo ""
+               echo "============================================================================="
+            else
+               clear
+            fi
+            echo "Press enter to continue"
+            read tempo3
+            break
+            ;;
+
+        "ConfigBackup Tool")
+            PS3='Please enter your choice: '
+            options=("Run Pretest CfgBackup" "Run Posttest CfgBackup" "Back to TopMenu")
+            clear
+            select opt in "${options[@]}"
+            do
+                         case $opt in
+                                        "Run Pretest CfgBackup")
+                         clear
+                                                 echo "Please enter unique session key"
+                                                 read uniQ
+                                                 echo ""
+                         echo "Configurations will be stored on /home/$VzID/BackupCFG"
+                         sleep 1
+                         echo ""
+                         echo "Starting PRE configuration backup now ..."
+                         echo ""
+                         $spath/.cfgbackup.sh $VzID $tacacs $snmpuser $snmpkey pre $uniQ
+                         wait
+                         echo ""
+                         echo "Press Enter to continue"
+                         read tempo4
+                         break
+                                         ;;
+                                    "Run Posttest CfgBackup")
+                         clear
+                                                 echo "Please enter unique session key"
+                                                 read uniQ
+                                                 echo ""
+                         echo "Configurations will be stored on /home/$VzID/BackupCFG"
+                         sleep 1
+                         echo ""
+                         echo "Starting POST configuration backup now ..."
+                         echo ""
+                         $spath/.cfgbackup.sh $VzID $tacacs $snmpuser $snmpkey post $uniQ
+                         wait
+                         echo ""
+                         echo "Press Enter to continue"
+                         read tempo5
+                         break
+                                         ;;
+                                    "Back to TopMenu")
+                                         break
+                                         ;;
+                                    *)
+                                    echo "invalid option. Please choose from options 1-2 and 3 to exit"
+                                    ;;
+                                esac
+                        done
+                        break
+            ;;
+
+        "Compare Tool")
+            PS3='Please enter your choice: '
+            options=("compare BackupCfgs" "compare showcmds" "Back to TopMenu")
+            clear
+            select opt in "${options[@]}"
+            do
+                            case $opt in
+                                        "compare BackupCfgs")
+                         clear
+                                                 echo "Please enter unique session key"
+                                                 read uniQ
+                                                 echo ""
+                         echo "Starting Pre and Post Config comparison ..."
+                         echo ""
+                                     sleep 1
+                         $spath/.comparator.sh $VzID $uniQ
+                         wait
+                         echo ""
+                         echo "Press Enter to continue"
+                                     read tempo6
+                         break
+                                         ;;
+                                    "compare showcmds")
+                         clear
+                                                 echo "Please enter unique session key"
+                                                 read uniQ
+                                                 echo ""
+                         echo "Starting Pre and Post show commands comparison ..."
+                         echo ""
+                                     sleep 1
+                         $spath/.comparator2.sh $VzID $uniQ
+                         wait
+                         echo ""
+                         echo "Press Enter to continue"
+                                     read tempo7
+                         break
+                                         ;;
+                                    "Back to TopMenu")
+                                         break
+                                         ;;
+                                    *)
+                                    echo "invalid option. Please choose from option 1-2 and 3 to exit"
+                                    ;;
+                                esac
+                        done
+                        break
+            ;;
+
+        "IOS and FlashCheck Tool")
+            clear
+            echo "Starting Flash Free Space Validation now ..."
+            echo ""
+            $spath/.flashcheck.sh $VzID $tacacs $snmpuser $snmpkey
+            wait
+            echo "View result (y/n)"
+            read answer3
+            if [ "$answer3" == "y" ] || [ "$answer3" == "yes" ] || [ "$answer3" == "Yes" ] || [ "$answer3" == "Y" ] || [ "$answer3" == "YES" ]
+            then
+               echo "Please copy-paste the link shown above:"
+               read iosflashlink
+               echo ""
+               echo "============================================================================="
+               echo ""
+               cat $iosflashlink
+               echo ""
+               echo "============================================================================="
+            else
+               clear
+            fi
+            echo "Press enter to continue"
+            read tempo13
+            break
+            ;;
+
+        "Run showcmds Tool")
+            PS3='Please enter your choice: '
+            options=("Run Pretest SHCMD" "Run Posttest SHCMD" "Back to TopMenu")
+            clear
+            select opt in "${options[@]}"
+            do
+                            case $opt in
+                                        "Run Pretest SHCMD")
+                         clear
+                                                 echo "Please enter unique session key"
+                                                 read uniQ
+                                                 echo ""
+                         echo "Show outputs will be stored on /home/$VzID/showcmds folder"
+                         sleep 1
+                         echo ""
+                         echo "Starting PRE configuration backup now ..."
+                         echo ""
+                         $spath/.showcmds.sh $VzID $tacacs $snmpuser $snmpkey pre $uniQ
+                         wait
+                         echo ""
+                         echo "Press Enter to continue"
+                         read tempo8
+                         break
+                                         ;;
+                                    "Run Posttest SHCMD")
+                         clear
+                                                 echo "Please enter unique session key"
+                                                 read uniQ
+                                                 echo ""
+                         echo "Configurations will be stored on /home/$VzID/showcmds folder"
+                         sleep 1
+                         echo ""
+                         echo "Starting POST configuration backup now ..."
+                         echo ""
+                         $spath/.showcmds.sh $VzID $tacacs $snmpuser $snmpkey post $uniQ
+                         wait
+                         echo ""
+                         echo "Press Enter to continue"
+                         read tempo9
+                         break
+                                         ;;
+                                    "Back to TopMenu")
+                                         break
+                                         ;;
+                                    *)
+                                    echo "invalid option. Please choose from option 1-2 and 3 to exit"
+                                    ;;
+                                esac
+                        done
+                        break
+            ;;
+
+
+        "Quit")
+            clear
+            echo ""                                                                                    
+            echo "====================================================================="               
+            echo ""                                                                                    
+            echo "                               NOTE !!!                              "                
+            echo "Session log files are located on BackupCFG, DiffCFG, showcmds Folders"                
+            echo "Please note you'll need to transfer session files only if            "
+            echo "You're done running pre and post tools                               "
+            echo "Otherwise please choose NO.                                          "
+            echo ""                                                                                    
+            echo "====================================================================="  
+            echo ""
+                        echo "Do you want to transfer all session files to local repository (y/n)"
+                        read answer
+
+                        if [ "$answer" == "y" ] || [ "$answer" == "yes" ] || [ "$answer" == "Yes" ] || [ "$answer" == "Y" ] || [ "$answer" == "YES" ]
+            then
+                           mv /home/$VzID/BackupCFG/* /home/$VzID/ReposCFG/
+                           mv /home/$VzID/DiffCFG/* /home/$VzID/ReposCFG/
+                           mv /home/$VzID/showcmds/* /home/$VzID/ReposCFG/
+                        elif [ "$answer" == "n" ] || [ "$answer" == "N" ] || [ "$answer" == "no" ] || [ "$answer" == "No" ] || [ "$answer" == "NO" ]
+                        then
+               echo "Press enter to continue"    
+                           read tempo10
+                        else
+                           echo "incorrect answer. Please answer with y or n only"
+                           break
+                        fi
+
+            echo "Exiting the script.."
+            echo "For any issues encountered please let me know"
+            echo "Email me at mark.ivan.evaristo@intl.verizon.com"
+            sleep 2
+            exit
+            ;;
+        *)
+            echo "invalid option. Please choose from options 1-4 and 5 to exit"
+            ;;
+    esac
+done
+done
