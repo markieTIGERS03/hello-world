@@ -1,0 +1,67 @@
+#!/bin/bash
+
+VzID=$1
+uniQ=$2
+
+#Remove the 1st two lines of running config ##
+sed -i '/Last configuration change/d' /home/$VzID/BackupCFG/*
+sed -i '/NVRAM config last updated/d' /home/$VzID/BackupCFG/*
+sed -i '/ntp clock-period/d' /home/$VzID/BackupCFG/*
+
+
+clear
+echo -e "Running Pre and Post Config comparison script..."
+sleep 2
+clear
+echo -e "IP Address\t\t\t Compare Status"
+
+while read host
+do
+temp1=$(diff -sq /home/$VzID/BackupCFG/pre-$uniQ-$host.cfg /home/$VzID/BackupCFG/post-$uniQ-$host.cfg | grep -oP "differ|identical")
+if [ "$temp1" == "differ" ]
+then
+   diff -yB --suppress-common-lines /home/$VzID/BackupCFG/pre-$uniQ-$host.cfg /home/$VzID/BackupCFG/post-$uniQ-$host.cfg > /home/$VzID/DiffCFG/$host-$uniQ-diff.cfg
+   echo -e "$host\t\t\tDifferent"
+   echo "$host" >> /home/$VzID/DiffCFG/cfgdiffhost.list
+elif [ "$temp1" == "identical" ]
+then
+   echo -e "$host\t\t\tIdentical"
+else
+   echo -e "$host\t\t\tError"
+fi
+done < /home/repos/public/.mimetool/iplist
+
+echo ""
+echo "Script run complete. Detailed difference on each host store on: cd /home/$VzID/DiffCFG"
+echo ""
+echo "Show detailed difference? (y/n)"
+read "answer"
+clear
+
+if [ "$answer" == "y" ] || [ "$answer" == "yes" ] || [ "$answer" == "Yes" ] || [ "$answer" == "Y" ] || [ "$answer" == "YES" ]
+then
+    while read cfgdiffhost
+        do
+           echo "showing difference for host $cfgdiffhost (pre < > post)"
+           echo ""
+           cat /home/$VzID/DiffCFG/$cfgdiffhost-$uniQ-diff.cfg
+           echo ""
+           echo ""
+           echo ""
+           echo ""
+           echo ""
+           echo "==========================================================================================="
+        done < /home/$VzID/DiffCFG/cfgdiffhost.list
+        sleep 1
+        rm /home/$VzID/DiffCFG/cfgdiffhost.list
+elif [ "$answer" == "n" ] || [ "$answer" == "N" ] || [ "$answer" == "no" ] || [ "$answer" == "No" ] || [ "$answer" == "NO" ]
+then
+   rm /home/$VzID/DiffCFG/cfgdiffhost.list
+   echo "Press enter to continue"    
+   read tempo1
+else
+   echo "incorrect answer. Please answer with y or n only"
+   rm /home/$VzID/DiffCFG/cfgdiffhost.list
+fi
+
+exit
