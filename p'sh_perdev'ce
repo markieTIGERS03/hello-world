@@ -47,10 +47,10 @@ regexp {([^ ]+):([^ ]+)} $host match IP HWMODEL
                         -re "\[^ ]+assword:" { send "$Enable\r"}
                     }
                     expect {
-                        -re "\[^ ]+#$" { send "show ip route connected\r"}
+                        -re "\[^ ]+#$" { send "term len 0\r"}
                     }
                     expect {
-                        -re "\[^ ]+#$" { send "show ip route static\r"}
+                        -re "\[^ ]+#$" { send "show ip route connected\r"}
                     }
                     expect {
                         -re "\[^ ]+#$" { send "exit\r"}
@@ -64,7 +64,7 @@ regexp {([^ ]+):([^ ]+)} $host match IP HWMODEL
                     log_file
                     incr CTRF
                     }
-          }
+                            }
                                                   
           riverbed {
                set LOGIN_STATUS [catch {
@@ -84,6 +84,9 @@ regexp {([^ ]+):([^ ]+)} $host match IP HWMODEL
                         -re ">" { send "enable\r"}
                     }
                     expect {
+                        -re "#" { send "term len 0\r"}
+                    }
+                    expect {
                         -re "#" { send "show ip route\r"}
                     }
                     expect {
@@ -98,7 +101,7 @@ regexp {([^ ]+):([^ ]+)} $host match IP HWMODEL
                     log_file
                     incr CTRF
                     }
-          }
+                            }
 
           procurve {
                set LOGIN_STATUS [catch {
@@ -129,7 +132,10 @@ regexp {([^ ]+):([^ ]+)} $host match IP HWMODEL
                         -re "\[^ ]+assword:" { send "$Enable\r"}
                     }
                     expect {
-                        -re "\[^ ]+#" { send "show ip route\r"}
+                        -re "\[^ ]+#" { send "term len 1000\r"}
+                    }
+                    expect {
+                        -re "\[^ ]+#" { send "show ip route connected\r"}
                     }
                     expect {
                         -re "\[^ ]+#" { send "logout\r"}
@@ -146,7 +152,7 @@ regexp {([^ ]+):([^ ]+)} $host match IP HWMODEL
                     log_file
                     incr CTRF
                     }
-          }
+                            }
 
           comware {
                set LOGIN_STATUS [catch {
@@ -163,10 +169,13 @@ regexp {([^ ]+):([^ ]+)} $host match IP HWMODEL
                         -re "\[^ ]+assword:" { send "$Password\r"}
                     }
                     expect {
-                        -re "<\[^ ]+>" { send "display ip routing-table\r"}
+                        -re "<\[^ ]+>" { send "screen-length disable\r"}
                     }
                     expect {
-                        -re "<\[^ ]+>" { send "exit\r"}
+                        -re "<\[^ ]+>" { send "display ip routing-table protocol direct\r"}
+                    }
+                    expect {
+                        -re "<\[^ ]+>" { send "quit\r"}
                     }
                     log_file
                     expect eof
@@ -177,7 +186,7 @@ regexp {([^ ]+):([^ ]+)} $host match IP HWMODEL
                     log_file
                     incr CTRF
                     }
-           }
+                            }
           default {
                log_file $Directory/$IP
                send_log "$IP\t\tUNKNOWN DEVICE\n"
