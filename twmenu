@@ -251,7 +251,7 @@ tput sgr0
           
           echo "Exiting the script.."
           echo "For any issues encountered please let me know"
-          echo "Email me at mark.ivan.evaristo@intl.verizon.com"
+          echo "Email me at xxxxxxx"
           sleep 2
           exit
           ;;
