@@ -1,0 +1,33 @@
+set file [open "flash0:testfile" "w"]
+close $file
+
+set file [open "flash0:testfile" "r"]
+set contents [read $file]
+close $file
+
+append contents "exec term len 0"
+append contents "\r"
+append contents "terminal international\r"
+append contents "puts \"Start of config\" \r\r"
+append contents "ios_config \"interface Gi0/0\" \"vrf forwarding Mgmt-intf\" \"ip address 10.255.0.7 255.255.0.0\"\r"
+
+set file [open "flash0:testfile" "w"]
+puts $file $contents
+close $file
+
+====================
+
+set file [open "flash0:testfile" "w"]
+close $file
+
+set file [open "flash0:clearint" "r"]
+set contents [read $file]
+close $file
+
+append contents "typeahead \"\\r\"\r"
+append contents "exec \{clear counters Gi0/1\}\r"
+append contents "typeahead \"show ip route\\n\"\r"
+
+set file [open "flash0:clearint" "w"]
+puts $file $contents
+close $file
