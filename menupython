@@ -14,17 +14,22 @@ header = '''\
                                                               
 '''
  
-def foo():
-    print('You called foo()')
+def bau():
+    print('You called bau()')
     input("Press [Enter] to continue...")
  
-def bar():
-    print('You called bar()')
+def projects():
+    print('You called projects()')
+    input("Press [Enter] to continue...")
+    
+def serviceBau():
+    print('You called serviceBau()')
     input("Press [Enter] to continue...")
  
 menuItems = [
-    { "Call foo": foo},
-    { "Call bar": bar},
+    { "Call bau": bau},
+    { "Call projects": projects},
+    {'Call serviceBAU': serviceBau},
     { "Exit": exit},
 ]
  
@@ -35,7 +40,7 @@ def main():
         # Print some badass ascii art header here !
         for item in menuItems:
             for key, value in item.items():
-                print ('[ ' + str(menuItems.index(item)) + ']' + key)
+                print ('[' + str(menuItems.index(item)) + '] ' + key)
         choice = input(">> ")
         try:
             if int(choice) < 0 : raise ValueError
