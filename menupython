@@ -2,32 +2,17 @@ http://patorjk.com/software/taag/#p=display&f=Graffiti&t=DiffTool
 https://yassine.tioual.com/index.php/2017/03/28/writing-cool-cli-menus-with-python/
 
 import os
- 
-header = "\
-_________               .__    __________                   __               __\n\
-\_   ___ \  ____   ____ |  |   \______   \_______  ____    |__| ____   _____/  |_\n\
-/    \  \/ /  _ \ /  _ \|  |    |     ___/\_  __ \/  _ \   |  |/ __ \_/ ___\   __\\\n\
-\     \___(  <_> |  <_> )  |__  |    |     |  | \(  <_> )  |  \  ___/\  \___|  |\n\
- \______  /\____/ \____/|____/  |____|     |__|   \____/\__|  |\___  >\___  >__|\n\
-        \/                                             \______|    \/     \/      \n"
 
-header = "\        
-________  .__  _____  ________________           .__   
-\______ \ |__|/ ____\/ ____\__    ___/___   ____ |  |  
- |    |  \|  \   __\\   __\  |    | /  _ \ /  _ \|  |  
- |    `   \  ||  |   |  |    |    |(  <_> |  <_> )  |__
-/_______  /__||__|   |__|    |____| \____/ \____/|____/
-        \/  \n"                                          
- 
-colors = {
-        'blue': '\033[94m',
-        'pink': '\033[95m',
-        'green': '\033[92m',
-        }
- 
-def colorize(string, color):
-    if not color in colors: return string
-    return colors[color] + string + '\033[0m'
+header = '''\
+
+██████╗ ██╗███████╗███████╗████████╗ ██████╗  ██████╗ ██╗     
+██╔══██╗██║██╔════╝██╔════╝╚══██╔══╝██╔═══██╗██╔═══██╗██║     
+██║  ██║██║█████╗  █████╗     ██║   ██║   ██║██║   ██║██║     
+██║  ██║██║██╔══╝  ██╔══╝     ██║   ██║   ██║██║   ██║██║     
+██████╔╝██║██║     ██║        ██║   ╚██████╔╝╚██████╔╝███████╗
+╚═════╝ ╚═╝╚═╝     ╚═╝        ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝
+                                                              
+'''
  
 def foo():
     print('You called foo()')
@@ -46,7 +31,7 @@ menuItems = [
 def main():
     while True:
         os.system('clear')
-        header
+        print(header)
         # Print some badass ascii art header here !
         for item in menuItems:
             for key, value in item.items():
