@@ -1,0 +1,125 @@
+#!/usr/bin/env /home/repos/public/Python/bin/python3.6
+
+#Get your libraries
+import time
+import sys
+import os
+import getpass
+import xlrd
+try:
+    from meraki import meraki
+except:
+    os.system('/home/repos/public/Python/bin/python3.6 /home/repos/public/Python/bin/pip install --user requests')
+    os.system('/home/repos/public/Python/bin/python3.6 /home/repos/public/Python/bin/pip install --user meraki')
+try:
+    print('---loading...')
+    from meraki import meraki
+except:
+    sys.exit('installation failed. please contact admin')
+
+
+header = '''\
+
+'''
+
+os.system('clear')
+userID = os.getlogin()
+print(header)
+try:
+    myKey = getpass.getpass('---Enter API Key (Press Ctrl + C to exit): ')
+except:
+    sys.exit('Exiting...')
+myFile = '/home/' + userID + '/IVAN-Meraki-Input.xlsx'
+try:
+    book = xlrd.open_workbook(myFile)
+    sheet1 = book.sheet_by_index(0)
+except:
+    sys.exit('---No input file found or incorrect input file name. Use \"IVAN-Meraki-Input.xlsx\"')
+
+#Update device information
+def merUpdateInfo(myNetID, myAddress):
+    dlist = []
+    serialList = []
+    for i in range(8, sheet1.nrows):
+        dlist.append(sheet1.row_values(i))
+    for i in range(len(dlist)):
+        serialNumber = dlist[i][0]
+        deviceName = dlist[i][1]
+        if serialNumber in serialList:
+            print('---Serial: ' + serialNumber + ' device name and address are already updated. skipping to next serial...')
+            continue
+        else:
+            print('---Pushing Device-name and Address to: ' + serialNumber)
+            meraki.updatedevice(myKey, myNetID, serialNumber, name=deviceName, address=myAddress, move='true', suppressprint=True)
+            serialList.append(serialNumber)
+    for i in range(len(dlist)):
+        serialNumber = dlist[i][0]
+        deviceName = dlist[i][1]
+        portName = dlist[i][2]
+        portStart = str(dlist[i][3]).split('.')[0]
+        portEnd = str(dlist[i][4]).split('.')[0]
+        portType = dlist[i][5]
+        portVlan = str(dlist[i][6]).split('.')[0]
+        portVoice = str(dlist[i][7]).split('.')[0]
+        portAllowed = str(dlist[i][8])
+        portSTP = dlist[i][9]
+        try:
+            if portVoice != '':
+                for portNumber in range(int(portStart), int(portEnd)+1):
+                    print('---Pushing configuration with voice to Port: ' + str(portNumber) + ' of device: ' + deviceName)
+                    meraki.updateswitchport(myKey, serialNumber, portNumber, name=portName, porttype=portType, vlan=portVlan, voicevlan=portVoice, allowedvlans=portAllowed, stpguard=portSTP, suppressprint=True)
+            else:
+                for portNumber in range(int(portStart), int(portEnd)+1):
+                    print('---Pushing configuration without voice to Port: ' + str(portNumber) + ' of device: ' + deviceName)
+                    meraki.updateswitchport(myKey, serialNumber, portNumber, name=portName, porttype=portType, vlan=portVlan, allowedvlans=portAllowed, stpguard=portSTP, suppressprint=True)
+        except:
+            print('---No configuration pushed to device: ' + serialNumber)
+
+def main():
+    #Get Organization number, sitename and address
+    myOrg = sheet1.cell_value(4,1)
+    myPartialSiteName = sheet1.cell_value(5,1)
+    myAddress = sheet1.cell_value(6,1)
+    try:
+        orgs = meraki.myorgaccess(myKey, suppressprint=True)
+    except:
+        sys.exit('---Invalid keys. please try again')
+    org_names = [org['name'] for org in orgs]
+    try:
+        index = org_names.index(myOrg)
+        myOrgNumber = orgs[index]['id']
+        mySiteName = myOrg + '-' + myPartialSiteName + '-combined'
+        print('---Executing change for Organization: ' + myOrg)
+        print('---Executing change for Site: ' + mySiteName)
+    except:
+        sys.exit('---Organization name or Site name not found. Please check input file')
+
+    try:
+        answer1 = input('---Do you want to proceed (Y/N, Default=N): ').lower()
+        if answer1 in ['yes', 'y']:
+            pass
+        else:
+            sys.exit('---Exiting code')
+    except:
+        sys.exit('---Exiting code')
+        
+    #Get Network ID
+    current_networks = meraki.getnetworklist(myKey, myOrgNumber, suppressprint=True)
+    network_names = [network['name'] for network in current_networks]
+    if mySiteName in network_names:
+        myNetID = current_networks[network_names.index(mySiteName)]['id']
+        print('---The network {0} already exists with ID {1}'.format(mySiteName, myNetID))
+    else:
+        sys.exit('---Network {0} does not exist. Please check your network name'.format(mySiteName))
+    
+    merUpdateInfo(myNetID, myAddress)
+    
+    os.system('rm -f ' + myFile)
+    print('Input file IVAN-Meraki-Input.xlsx is now deleted. Run batch file to transfer new input file')
+    print('---end of code')
+    print('---For any errors encountered. Please capture error and send to gmail')
+    exit()
+
+
+if __name__ == '__main__':
+    main()
