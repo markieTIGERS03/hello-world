@@ -144,4 +144,3 @@ for device in devices_list:
 
     device.get_interfaces()         # Get interface info for this device
     print_device_info(device)       # Print interface info for this device
-
