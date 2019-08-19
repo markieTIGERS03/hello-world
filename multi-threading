@@ -1,0 +1,149 @@
+#!/usr/bin/env /home/repos/public/Python/bin/python3.6
+
+import pexpect
+import threading
+import re
+import sys
+import getopt
+import logging
+import time
+from queue import Queue
+
+def vPush(host, MIMEID, MIMEPassword, LANID, MIMEStats, MIMEUniq, MIMEType):
+    vPushStatus = []
+    logging.basicConfig(
+        filename='/home/repos/public/.alabtools/logs/BAU-RUN-listener.log',
+        filemode='a',
+        level=logging.DEBUG,
+        format='%(asctime)s.%(msecs)03d %(levelname)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+    )
+        
+    # Create regular expressions to match interfaces and OSPF
+    Prompt = re.compile(b'[>#]\s?$')
+    
+    try:
+        #Establish SSH connection with timeout set to 10
+        session = pexpect.spawn('ssh -o ConnectTimeout=10 -oStrictHostKeyChecking=no -l ' + LANID + " " + host, timeout=60)
+        result = session.expect(['PAIVANODE','assword:', Prompt, pexpect.TIMEOUT, pexpect.EOF])
+        
+        # Check for failure
+        if result == 2:
+            pass
+        elif result == 3:
+            logging.error('---Timeout or unexpected reply from device: ' + host)
+            vPushStatus.append('---Timeout or unexpected reply from device: {}'.format(host))
+            return vPushStatus
+        elif result == 4:
+            logging.error('---Timeout or unexpected reply from device: ' + host)
+            vPushStatus.append('---Timeout or unexpected reply from device: {}'.format(host))
+            return vPushStatus
+    
+        session.sendline(MIMEPassword)
+        result = session.expect([Prompt, pexpect.TIMEOUT, pexpect.EOF])
+        if result != 0:
+            logging.error('---Service password incorrect. Contact admin to update pw. ' + host)
+            vPushStatus.append('---Service password incorrect. Contact admin to update pw. {}'.format(host))
+            return vPushStatus
+    
+        # Successfully got username prompt, enter username
+        logging.info('---Login to ' + host + ' successful')
+        vPushStatus.append('---Login to {} successful'.format(host))
+        
+        #create logfile path
+        logpath = '/home/' + MIMEID + '/IVANtools/' + MIMEType + '/showcmds/' + MIMEStats+ '-' + MIMEUniq + '-' + MIMEType + '-show-' + host
+        session.logfile = open(logpath, 'wb')
+        
+        with open('/home/' + MIMEID + '/IVANtools/' + MIMEType + '/' + 'commands-' + MIMEType, 'r') as g:
+            cmdlist = [line2.strip() for line2 in g]
+    
+        for cmd in cmdlist:
+            session.sendline(cmd)
+            result = session.expect([Prompt, pexpect.TIMEOUT, pexpect.EOF])
+            if result != 0:
+                logging.info('---Unable to run command device connection freeze: ' + cmd)
+                vPushStatus.append('---Prompt froze. Unable to run command {}, '.format(cmd))
+                continue
+            else:
+                logging.info('---Running command: ' + cmd)
+                vPushStatus.append('---Running command: {}'.format(cmd))
+        
+        session.sendline('exit')
+        result = session.expect([pexpect.EOF, pexpect.TIMEOUT])
+        if result == 0:
+            logging.info('---Successfully exited device ' + host)
+            vPushStatus.append('---Successfully exited device: {}'.format(host))
+        elif result == 1:
+            logging.info('---Exit via Timeout device ' + host)
+            vPushStatus.append('---Exit via Timeout for device: {}'.format(host))
+        session.logfile.close()
+        session.close()
+        logging.info('---Log created: ' + logpath)
+        vPushStatus.append('---Log created: {}'.format(logpath))
+        return vPushStatus
+    except:
+        logging.info('---Unexpected error on device: ' + host)
+        vPushStatus.append('---Unexpected error on device: {}'.format(host))
+        return vPushStatus
+
+def worker(MIMEID, MIMEPassword, LANID, MIMEStats, MIMEUniq, MIMEType):
+    threadName = threading.current_thread().getName()
+    while (q.qsize() != 0):
+        try:
+            device = q.get()
+            status = vPush(device, MIMEID, MIMEPassword, LANID, MIMEStats, MIMEUniq, MIMEType)
+            for line in status:
+                print('{}: {}'.format(threadName,line))
+            q.task_done()
+        except:
+            return
+
+#MAIN        
+try:
+    opts, args = getopt.getopt(sys.argv[1:], 'u:l:p:s:q:t:h', ['username=', 'lanid=', 'password=', 'stats=', 'uniQ=', 'typE=', 'help'])
+except getopt.GetoptError:
+    print('Usage: xxxx.py -u <username> -p <password> -e <enablepass>')
+    sys.exit(2)
+
+for opt, arg in opts:
+    if opt in ('-h', '--help'):
+        print('Usage: xxxx.py -u <username> -p <password> -e <enablepass>')
+        sys.exit(2)
+    elif opt in ('-u', '--username'):
+        MIMEID = arg
+    elif opt in ('-p', '--password'):
+        MIMEPassword = arg
+    elif opt in ('-l', '--lanid'):
+        LANID = arg
+    elif opt in ('-s', '--stats'):
+        MIMEStats = arg
+    elif opt in ('-q', '--uniQ'):
+        MIMEUniq = arg
+    elif opt in ('-t', '--typE'):
+        MIMEType = arg
+    else:
+        print('Usage: xxxx.py -u <username> -p <password> -e <enablepass>')
+        sys.exit(2)
+
+q = Queue()
+with open('/home/' + MIMEID + '/IVANtools/' + MIMEType + '/' + MIMEType + '-iplist', 'r') as f:
+    ipadd = [line.strip() for line in f]
+for item in ipadd:
+    q.put(item)
+maxAllowedThread = min(3, q.qsize())
+threadList = []
+print('Total number of Device {0} queued'.format(q.qsize()))
+print('Starting {0} threads.'.format(maxAllowedThread))
+start = time.time()
+for i in range(maxAllowedThread):
+    t = threading.Thread(target = worker, args = (MIMEID, MIMEPassword, LANID, MIMEStats, MIMEUniq, MIMEType))
+    t.daemon = True
+    t.start()
+    threadList.append(t)
+    print('---Starting thread {}'.format(i))
+[t.join() for t in threadList]
+q.join()
+
+print('---End of code')
+print('Entire job took: {}'.format(time.time()-start))
+exit()
